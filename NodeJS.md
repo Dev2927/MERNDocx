@@ -95,3 +95,47 @@ For the above program, event queues are initialized in the following manner:
 
 ![alt text](image-3.png)
 
+*Q3. How does the Node.js event loop differ from browser?*
+
+Event Loop in Browser
+
+![alt text](image-4.png)
+
+1. Heap - It stores all the object reference and variables that we define in our function.
+
+2. Call Stack - All the function that we use in our code is stacked here in LIFO manner such that the last function is at the top and first function is at the bottom.
+
+3. Web API's - These API's are provided by browser which provides additional functionality over V8 engine. The functions which uses these API's are pushed to this container which on completion of the response of Web API is popped out of this container.
+
+4. Queues - The queues are used to compute the asynchronous code response such that it doesn't block engine to execute further.
+
+- Macro Task Queue - This queue executes async functions like DOM events, Ajax calls and setTimeout and has lower priority than Job queue.
+
+- Micro Task Queue - This queue executes async functions which uses promises and has higher precedence over Message Queue.
+
+The event loop checks the Call Stack, if the stack is empty it pushes the functions in the Queues to Call Stack and runs it. Functions already present are given higher priority and runs first in comparison to functions in message queue.
+
+Event Loop in Node Js
+
+![alt text](image-5.png)
+
+1. Event Queue - On completion of the Thread Pool a callback function is issued and sent to the event queue. When call stack is empty the event goes through the event queue and sends callback to the call stack.
+
+2. Thread Pool - The thread pool is composed of 4 threads which delegates operations that are too heavy for the event loop. I/O operations, Opening and closing connections, setTimeouts are the example of such operations.
+
+3. Event loop in Node Js has different phases which has FIFO queue of callbacks to execute. When event loop enters a given phase it operates callbacks in that phase queue until the queue has been exhausted and maximum number of callbacks has executed and then moves to next phase.
+
+The Event Loop is an endless loop which waits for the tasks, executes them and then sleeps until it receives more tasks. The event loop executes tasks from queue only when stack is empty. It processes the oldest task first and allows us to use callbacks and promises.
+
+Difference between both the event loops
+
+1. First difference is node uses a thread pool to manage disk I/O. It executes the I/O and other timer API's asynchronously.
+
+2. Browser does not have setImmediate() function. This function execute once the I/O operation is done, if particular code is inside this it will be executed first. Whereas in setTimeout() callback function is executed after given minimum threshold value in milliseconds.
+
+3. Node Js event loop has multiple phases and each phase handle specific type of tasks whereas browser has micro task and macro task queue within which all the tasks are processed in order they were placed into the queue.
+
+*Q5. What are streams in Node.js?*
+
+Streams are collections of data — just like arrays or strings. The difference is that streams might not be available all at once, and they don’t have to fit in memory. This makes streams really powerful when working with large amounts of data, or data that’s coming from an external source one chunk at a time.
+                           However, streams are not only about working with big data. They also give us the power of composability in our code. Just like we can compose powerful linux commands by piping other smaller Linux commands, we can do exactly the same in Node with streams.						   
