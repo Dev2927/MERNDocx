@@ -138,4 +138,121 @@ Difference between both the event loops
 *Q5. What are streams in Node.js?*
 
 Streams are collections of data — just like arrays or strings. The difference is that streams might not be available all at once, and they don’t have to fit in memory. This makes streams really powerful when working with large amounts of data, or data that’s coming from an external source one chunk at a time.
-                           However, streams are not only about working with big data. They also give us the power of composability in our code. Just like we can compose powerful linux commands by piping other smaller Linux commands, we can do exactly the same in Node with streams.						   
+                           However, streams are not only about working with big data. They also give us the power of composability in our code. Just like we can compose powerful linux commands by piping other smaller Linux commands, we can do exactly the same in Node with streams.
+
+*Q6. Explain readable and writable streams.*
+
+Readable
+
+- To add data to a readable stream, you use the .push() function. When the stream is finished, you push(null).
+
+- When ended, readable streams fire the 'end' event.
+
+- You can read data from a readable stream by listening for the 'readable' event and then executing 'read()' until it returns null.
+
+- Readable streams have a buffer, meaning that when you 'push()' to a buffer, if the buffer is full, then push() will return false. However, you can continue pushing to the buffer and filling it even though it's full. The 'highWaterMark' (or the buffer size) is really informational.
+
+- Readable streams implement a _read() method to pull data from a non-stream source. You don't have to use this, however. You can just leave this method blank and use the push method described earlier. Whoever is using your stream could call read(), which would first read from the internal buffer, and then go call _read() when the buffer is empty.
+
+Writable
+
+- To add data to a writable stream, you use the .write() function. When the stream is finished, you use .end().
+
+- When you call .end(), it does NOT end the stream immediately. It will use process.nextTick() to end the stream on the next tick! This has caused many race condition heartaches for me.
+
+- Writable streams have a buffer. If the buffer is full (highWaterMark), then it will return false when you call .write(). However, you can keep writing to it and ignore this event if you want. Otherwise, I think there's something like a 'drain' event that notifies you that you can continue writing.
+
+- Writable streams implement a _write() method to send the data to some back-end non-stream sink. If this method returns false, then the Writable stream will start buffering data and not call _write() again until 'drain'.
+
+*Q7. What is middleware in Express?*
+
+Middleware in Express.js are functions that run during the request–response lifecycle to process requests, modify responses, and control application flow.
+
+- Executes custom logic for each request.
+- Can read or modify req and res.
+- May send a response and end the cycle.
+- Uses next() to pass control to the next middleware.
+
+![alt text](image-6.png)
+
+Syntax
+
+app.use((req, res, next) => {
+    console.log('Middleware executed');
+    next();
+});
+
+- (req, res, next) => {}: Middleware function to process the request and response before the final handler.
+- next(): Passes control to the next middleware if the request–response cycle isn’t ended.
+
+Working of Middleware in Express.js
+
+In Express.js, middleware functions are executed sequentially in the order they are added to the application.
+
+1. Request arrives at the server.
+2. Middleware functions are applied to the request, one by one.
+3. Each middleware either sends a response or passes control using next().
+4. If no middleware ends the cycle, the route handler is reached, and a final response is sent.
+
+Types of Middleware
+
+1. Application-level Middleware
+
+Application-level middleware runs across the entire Express application, handling common logic for all incoming requests.
+
+- Registered using app.use() or app.METHOD().
+- Executes for all routes and HTTP methods.
+- Commonly used for logging, authentication, body parsing, and headers.
+
+app.use(express.json()); // Parses JSON data for every incoming request
+app.use((req, res, next) => {
+  console.log('Request received:', req.method, req.url);
+  next();
+});
+
+2. Router-level Middleware
+
+Router-level middleware applies to a specific router instance, allowing middleware logic to be scoped to a defined group of routes.
+
+- Registered using router.use() or router.METHOD().
+- Executes only for routes within that router.
+- Ideal for modular route grouping (e.g., auth or user routes).
+- Improves code organization and maintainability by isolating middleware to related routes.
+
+const router = express.Router();
+
+// Apply middleware to only this router's routes
+router.use((req, res, next) => {
+  console.log('Router-specific middleware');
+  next();
+});
+
+router.get('/dashboard', (req, res) => {
+  res.send('Dashboard Page');
+});
+
+app.use('/user', router); // The middleware applies only to routes under "/user"
+
+3. Built-in Middleware
+
+Express offers built-in middleware functions to handle common server tasks efficiently.
+
+- express.static() serves static files like images, CSS, and JS.
+- express.json() parses incoming JSON request bodies.
+
+app.use(express.static('public')); // Serves static files from the "public" folder
+app.use(express.json()); // Parses JSON payloads in incoming requests
+
+Middleware Chaining
+
+Express allows middleware functions to be chained and executed sequentially, processing a request step by step before sending a response.
+
+- Middleware runs in order as a chain.
+- Each middleware can process or modify the request.
+- The final handler sends the response to the client.
+- next() passes control to the next middleware in the chain.
+
+![alt text](image-7.png)
+
+*Q7. How does Express routing work?*
+
