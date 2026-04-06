@@ -441,3 +441,205 @@ There can be multiple threads available in a process, so if we talk about a comp
 As we know in a process, there are multiple things like memory, heap, stack, etc. When it comes to threads we all are wondering how different threads gonna execute small pieces of a program with now single stack and if they are different then How memory is gonna get distributed? The answer to all questions is that all threads have their stack and all these threads work by sharing the memory. Whenever anything comes to a thread it gets in the stack and gets executed and since all have the same memory then it’s easy for us to get the final result from process because the all threads are gonna return results in the same place. The problem here is that threads are not isolated, unlike multiple processes. If anything wrong happens within one thread it might affect the result of other threads too.
 
 There is a concept in threading called multithreading: You all know threading and multithreading are nothing different. As you know when we have a complex process to perform then we break the process into smaller pieces and instead of assigning whole pieces of the process to a single thread we can create multiple threads and make our process execute faster. All the threads in the process gonna share the same memory but all the threads consist of different stacks.
+
+*Q13. What is Load Balancing?*
+
+![alt text](image-16.png)
+
+In the world of computers and the internet, load balancing works similarly. When a website or online service becomes super popular, it starts receiving a flood of requests from users all over the place. Instead of relying on a single server to handle all these requests (like the one chef scenario), load balancing spreads the workload across multiple servers.
+
+By doing this, no single server gets overwhelmed with too much traffic, and every server gets to share the load. This prevents crashes, slowdowns, and annoying error messages, making sure that users like you and me have a smooth and enjoyable experience while browsing websites or using online applications.
+
+Load balancing algorithms decide which server should handle each request, making sure they’re divvied up fairly. Think of it as a smart traffic cop redirecting cars during rush hour, ensuring that everyone gets where they need to be without a traffic jam.
+
+Types of Load Balancers based on the OSI Model
+
+![alt text](image-17.png)
+
+Load balancers are categorized based on the layer of the OSI (Open Systems Interconnection) model at which they operate.
+
+1. Network Load Balancer (Load Balancer 4):
+Layer 4 Load Balancer operates at the transport layer (Layer 4) of the OSI model. It makes decisions based on information such as the source and destination IP addresses, as well as the port numbers of incoming requests. The main focus of Layer 4 load balancers is to distribute network traffic efficiently across multiple servers.
+
+How it works:
+When a user sends a request to access a website or application, the Layer 4 Load Balancer receives the request. It then looks at the transport layer data (IP addresses and ports) to determine which server should handle the request. The load balancer uses various algorithms (e.g., round-robin, least connections) to decide the best server to forward the request to. This ensures that traffic is evenly spread among the servers, improving performance and avoiding overloading any single server.
+
+Advantages:
+- High performance and low latency due to its network-level decisions.
+- Suitable for distributing TCP and UDP traffic efficiently.
+- Ideal for scenarios where content-based decisions are not necessary.
+
+Disadvantages:
+- Limited in making application-specific decisions.
+
+2. Application Load Balancer (Load Balancer 7):
+Layer 7 Load Balancer operates at the application layer (Layer 7) of the OSI model. It can make more intelligent decisions based on application-specific data, such as HTTP headers, cookies, and URLs. Layer 7 Load Balancers understand application protocols, enabling them to optimize traffic distribution for specific applications or services.
+
+How it works:
+When a user sends a request, the Layer 7 Load Balancer analyzes the content of the request to gain insights into the application being accessed. For example, it can identify the type of service (e.g., HTTP, HTTPS, FTP) or the specific URL being requested. Using this information, the load balancer can make intelligent decisions about which server is best suited to handle the request. This allows for more advanced load balancing strategies, such as sending certain requests to specialized servers that can handle specific application tasks.
+
+Advantages:
+- Application-aware and can optimize traffic based on specific application requirements.
+- Allows for content-based routing and advanced load balancing algorithms.
+- Suitable for complex applications that require different server responses based on the type of request.
+
+Disadvantages:
+- Higher processing overhead compared to Layer 4 Load Balancer due to content analysis.
+
+Load Balancing Algorithms
+
+1. Round Robin
+
+The Round Robin load balancing algorithm is one of the simplest and most straightforward methods used to distribute incoming network traffic across multiple servers. It operates at the transport layer (Layer 4) of the OSI model and is commonly used in various load balancers.
+
+ How it works:
+
+ 1. Server Pool: To begin, the load balancer maintains a pool of available servers that are ready to handle incoming requests. These servers could be physical machines, virtual instances, or containers.
+
+ 2. Request Distribution: When a new request comes in, the load balancer starts at the first server in the pool and forwards the request to that server. For the next request, it moves to the next server in line and forwards the request to that server, continuing this sequential pattern.
+
+ 3. Circular Pattern: The load balancer cycles through the list of servers in a circular fashion. Once it reaches the last server in the pool, it goes back to the first server and starts the cycle again. This ensures an even distribution of requests across all servers.
+
+ The Round Robin algorithm is stateless, meaning it doesn’t consider the current load or responsiveness of servers when making the distribution decision. All servers are treated equally, regardless of their current workload.
+
+ ![alt text](image-18.png)
+
+ Advantages:
+
+ - Simplicity: Round Robin is one of the simplest load balancing algorithms to implement. It doesn’t require complex calculations or in-depth server monitoring.
+
+ - Equal Workload: The algorithm ensures an even distribution of incoming requests among all servers in the pool. Each server gets an equal share of the load, promoting fair resource utilization.
+
+ - No Session Affinity: Round Robin is stateless, meaning it doesn’t rely on session information or maintain any state about previous requests. This makes it suitable for stateless applications or scenarios where session affinity is not required.
+
+ Disadvantages:
+
+ - Unequal Server Capacities: Round Robin treats all servers equally, regardless of their capacities or performance capabilities. This can lead to some servers being overburdened if they are less powerful than others in the pool.
+
+ - No Health Monitoring: The algorithm lacks intelligence to monitor server health or responsiveness. If a server becomes unavailable or experiences performance issues, Round Robin continues to forward requests to that server.
+
+ - Load Imbalance: In practice, the actual workload of requests can vary, even with Round Robin. Certain requests may be more resource-intensive, leading to imbalances in server loads.
+
+ 2. Weighted Round Robin
+
+ The Weighted Round Robin load balancing algorithm is an extension of the basic Round Robin algorithm. It aims to address the issue of unequal server capacities by assigning different weights to each server in the pool. These weights represent the relative capacity or performance of each server. Servers with higher weights get a larger share of the incoming traffic, while servers with lower weights receive a smaller share.
+
+ How it works:
+
+ 1. Assigning Weights: Each server in the pool is assigned a weight, which represents its capacity or processing power. Servers with higher capacities are given higher weights, and those with lower capacities receive lower weights.
+
+ 2. Weight-Based Distribution: When a new request comes in, the load balancer uses the weights to determine which server should handle the request. It cycles through the servers in a circular manner, as in the basic Round Robin algorithm, but with a slight modification. Instead of equal distribution, it takes into account the weights of the servers.
+
+ 3. Proportional Allocation: The load balancer forwards incoming requests to servers based on their weights. Servers with higher weights receive a larger proportion of the traffic, while servers with lower weights handle fewer requests.
+
+ 4. Equal Load per Weight: Within the subset of servers with the same weight, the load is distributed equally using basic Round Robin. This ensures that all servers with the same weight share the traffic evenly.
+
+ Advantages:
+
+ - Capacity-Based Distribution: Weighted Round Robin accounts for the different capacities of servers, ensuring that more powerful servers handle a higher proportion of the traffic.
+ 
+ Disadvantages:
+
+ - Static Configuration: Weighted Round Robin requires manual configuration of server weights. It may not adapt dynamically to changes in server performance or capacity.
+
+ 3. IP Hash
+
+ The IP Hash load balancing algorithm is a method used to distribute incoming network traffic across multiple servers based on the source IP address of the client. This algorithm operates at the application layer (Layer 7) of the OSI model and is commonly used in environments where session persistence or sticky sessions are required.
+
+ How it works:
+
+ 1. Client IP Address: When a client (usually a user’s device) sends a request to access a website or application, the load balancer extracts the source IP address from the incoming request.
+
+ 2. Hashing the IP Address: The IP address is then hashed, meaning it is converted into a unique numerical value using a hash function. The hash function ensures that the same IP address will always produce the same hash value.
+
+ 3. Determining the Server: The load balancer uses the hashed value to map the client’s IP address to a specific server in the pool. This mapping is typically done by dividing the hash value by the total number of servers and selecting the corresponding server.
+
+Advantages:
+
+- Session Persistence: IP Hash provides session affinity, ensuring that subsequent requests from the same client are always directed to the same server. This is crucial for applications that rely on maintaining user sessions or state.
+
+Disadvantages: 
+
+- Uneven Workload: If a few clients generate a disproportionately large amount of traffic, the corresponding servers may experience a higher workload, potentially causing imbalances.
+
+4. Least Connection Algorithm
+
+The Least Connection load balancing algorithm is designed to distribute incoming network traffic across multiple servers based on the number of active connections each server currently has. The main objective of this algorithm is to direct new requests to the server with the least number of connections, ensuring a more balanced distribution of the workload.
+
+How it works:
+
+1. Tracking Connections: The load balancer continuously monitors the number of active connections on each server in the pool. It keeps track of how many clients are currently connected to each server.
+
+2. Choosing the Least Connection: When a new request comes in, the load balancer evaluates the current connection count for each server and selects the server with the fewest active connections.
+
+3. Load Distribution: The new request is then forwarded to the chosen server, which has the least burden of active connections.
+
+4. Equalizing Connections: By directing new requests to servers with fewer connections, the Least Connection algorithm attempts to balance the number of connections across all servers in the pool.
+
+Advantages:
+
+- Dynamic Load Distribution: The Least Connection algorithm adapts in real-time to the actual workload on each server, ensuring that new requests are directed to the least busy server at that moment.
+
+Disadvantages:
+
+- Connection Fluctuations: The Least Connection algorithm may cause frequent fluctuations in connections for some servers, especially when the workload is volatile.
+
+*Q14. What is Consistent Hashing?*
+
+Before diving deep into Consistent Hashing, let’s first understand what Hashing is? Hashing is a computationally efficient way of information retrieval and helpful in enhancing the performance of various programs. In hashing, a hash function is generally used to map the information to a storage pool by generating a hash value using a well-defined logic.
+
+For example we can generate a random number that can map to storage by taking mod using the total number of servers. Hence, the hashing is used to map the requests to various servers and get the work done. However, this concept is valid only when the servers don’t change and memory locations are known. Distributed systems often involve changing the underlying servers to handle the requests over a network. Hence to deal with such shortcoming of distributed systems and handle the requests over a network, we need a more efficient manner of handling and organizing requests for a scalable application. This is compensated using Consistent Hashing.
+
+Consistent hashing is an improvement over normal Hashing. Here, the user and servers are located virtually in a circular ring structure called the Hash ring. The ring is considered infinite and can accommodate any number of servers with/having no fixed allocation and assign them to random locations based on some hash function.
+
+*Q15. What is Sharding?*
+
+Database sharding is the process of storing a large database across multiple machines. A single machine, or database server, can store and process only a limited amount of data. Database sharding overcomes this limitation by splitting data into smaller chunks, called shards, and storing them across several database servers. All database servers usually have the same underlying technologies, and they work together to store and process large volumes of data. Database sharding is one of the methods to solve this problem because it enables parallel processing of smaller datasets across shards.
+
+Benefits of database sharding
+
+- Improve response time: Data retrieval takes longer on a single large database. The database management system needs to search through many rows to retrieve the correct data. By contrast, data shards have fewer rows than the entire database. Therefore, it takes less time to retrieve specific information, or run a query, from a sharded database.
+
+- Avoid total service outage: If the computer hosting the database fails, the application that depends on the database fails too. Database sharding prevents this by distributing parts of the database into different computers. Failure of one of the computers does not shut down the application because it can operate with other functional shards. Sharding is also often done in combination with data replication across shards. So, if one shard becomes unavailable, the data can be accessed and restored from an alternate shard.
+
+- Scale efficiently: A growing database consumes more computing resources and eventually reaches storage capacity. Organizations can use database sharding to add more computing resources to support database scaling. They can add new shards at runtime without shutting down the application for maintenance.
+
+Shared-nothing architecture
+
+Database sharding operates on a shared-nothing architecture. Each physical shard operates independently and is unaware of other shards. Only the physical shards that contain the data that you request will process the data in parallel for you. 
+
+A software layer coordinates data storage and access from these multiple shards. For example, some types of database technology have automatic sharding features built in. Software developers can also write sharding code in their application to store or retrieve information from the correct shard or shards.
+
+*Q16. What are Bloom Filters?*
+
+In system design, Bloom Filters emerge as an elegant solution for efficient data querying and storage. This probabilistic data structure offers a compact representation, adept at determining set membership with minimal memory footprint. By leveraging hash functions and bit arrays, Bloom Filters excel in scenarios demanding rapid retrieval and space optimization.
+
+Bloom Filters are probabilistic data structures used for membership testing in a set. They efficiently determine whether an element is possibly in the set or definitely not, with a small probability of false positives. These filters consist of a bit array and multiple hash functions.
+
+How do Bloom Filters Work?
+
+- Bloom Filters work by using a bit array, typically initialized with all bits set to 0, and a set of hash functions.
+- When an element is added to the Bloom Filter, it undergoes hashing through each of the hash functions, which produce a set of indexes in the bit array. These indexes are then set to 1.
+- To check if an element is present in the Bloom Filter, it undergoes the same hashing process.
+- If all the corresponding bits in the array are set to 1, the filter indicates that the element may be present in the set.
+- However, if any of the bits are 0, then the element is definitely not in the set.
+
+Bloom Filters can give false positives, meaning they may incorrectly indicate that an element is present in the set when it is not. This can happen due to hash collisions, where multiple elements map to the same set of indexes in the bit array. The probability of false positives can be controlled by adjusting the size of the bit array and the number of hash functions used.
+
+*Q17. What is Data Replication?*
+
+Data Replication is the process of storing data in more than one site or node. It is simply copying data from a database from one server to another server.
+
+Types of algorithms for implementing Database Replication?
+
+1. Single Leader Replication (Active-Passive or Master-Slave Replication)
+
+- So in leader based architecture, client (application server) requests are sent to leader DB first and after that leader sends the data changes to all of its followers as a part of the replication log.
+
+- Whenever a client wants to read data from the database then it can query either leader or any of the follower (Yes there is generally more than just one follower to make the system highly available). However, writes to the database is only accepted on the leader by the client.
+
+- Now whenever a follower dies our application will not get impacted as there is not just a single node of data. Our application can read from other followers as well and hence this makes our system highly Read Scalable
+
+Used in: PostgreSQL, MySql, SQL Server, MongoDB, Kafka, etc.
+
+
