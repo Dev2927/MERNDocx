@@ -74,7 +74,7 @@ Interesting Facts about Data Types
 
 Before the advent of ES6, var declarations ruled. There are issues associated with variables declared with var, though. That is why it was necessary for new ways to declare variables to emerge. First, let's get to understand var more before we discuss those issues.
 
-Scope of var
+# Scope of var
 
 Scope essentially means where these variables are available for use. var declarations are globally scoped or function/locally scoped. The scope is global when a var variable is declared outside a function. This means that any variable that is declared with var outside a function block is available for use in the whole window. var is function scoped when it is declared within a function. This means that it is available and can be accessed only within that function.
 
@@ -88,7 +88,7 @@ function newFunction() {
 
 Here, greeter is globally scoped because it exists outside a function while hello is function scoped. So we cannot access the variable hello outside of a function.
 
-Hoisting of var
+# Hoisting of var
 
 Hoisting is a JavaScript mechanism where variables and function declarations are moved to the top of their scope before code execution. So var variables are hoisted to the top of their scope and initialized with a value of undefined.
 
@@ -137,3 +137,46 @@ Why is there no error? This is because both instances are treated as different v
 # Hoisting of let
 
 Just like var, let declarations are hoisted to the top. Unlike var which is initialized as undefined, the let keyword is not initialized. So if you try to use a let variable before declaration, you'll get a Reference Error.
+
+3. Const
+
+Variables declared with the const maintain constant values. const declarations share some similarities with let declarations.
+
+# const declarations are block scoped
+
+Like let declarations, const declarations can only be accessed within the block they were declared.
+
+# const cannot be updated or re-declared
+
+This means that the value of a variable declared with const remains the same within its scope. It cannot be updated or re-declared. So if we declare a variable with const, we can neither do this:
+
+const greeting = "say Hi";
+greeting = "say Hello instead"; // error: Assignment to constant variable.
+
+nor this:
+
+const greeting = "say Hi";
+const greeting = "say Hello instead";// error: Identifier 'greeting' has already been declared
+
+Every const declaration, therefore, must be initialized at the time of declaration. This behavior is somehow different when it comes to objects declared with const. While a const object cannot be updated, the properties of this objects can be updated. Therefore, if we declare a const object as this: 
+
+const greeting = {
+     message: "say Hi",
+     times: 4
+}
+
+while we cannot do this:
+
+greeting = {
+    words: "Hello",
+    number: "five"
+} // error:  Assignment to constant variable.
+
+we can do this:   greeting.message = "say Hello instead";
+
+This will update the value of greeting.message without returning errors.
+
+# Hoisting of const
+Just like let, const declarations are hoisted to the top but are not initialized.
+
+*Q3. What is == vs === in JavaScript?*
