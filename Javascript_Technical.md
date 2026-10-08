@@ -179,4 +179,64 @@ This will update the value of greeting.message without returning errors.
 # Hoisting of const
 Just like let, const declarations are hoisted to the top but are not initialized.
 
-*Q3. What is == vs === in JavaScript?*
+*Q3. What is the Execution Context?*
+
+When the JavaScript engine scans a script file, it makes an environment called the Execution Context that handles the entire transformation and execution of the code.
+
+During the context runtime, the parser parses the source code and allocates memory for the variables and functions. The source code is generated and gets executed.
+
+There are two types of execution contexts: global and function. The global execution context is created when a JavaScript script first starts to run, and it represents the global scope in JavaScript. A function execution context is created whenever a function is called, representing the function's local scope.
+
+Phases of the JavaScript Execution Context
+There are two phases of JavaScript execution context:
+
+1. Creation phase: In this phase, the JavaScript engine creates the execution context and sets up the script's environment. It determines the values of variables and functions and sets up the scope chain for the execution context.
+
+2. Execution phase: In this phase, the JavaScript engine executes the code in the execution context. It processes any statements or expressions in the script and evaluates any function calls.
+
+Everything in JS happens inside this execution context. It is divided into two components. One is memory and the other is code. It is
+important to remember that these phases and components are applicable to both global and functional execution contexts.
+
+*Q4. What is the Call Stack?*
+
+To keep the track of all the contexts, including global and functional, the JavaScript engine uses a call stack. A call stack is also known as an 'Execution Context Stack', 'Runtime Stack', or 'Machine Stack'.
+
+It uses the LIFO principle (Last-In-First-Out). When the engine first starts executing the script, it creates a global context and pushes it on the stack. Whenever a function is invoked, similarly, the JS engine creates a function stack context for the function and pushes it to the top of the call stack and starts executing it.
+
+When execution of the current function is complete, then the JavaScript engine will automatically remove the context from the call stack and it goes back to its parent.
+
+Let's see the following example:
+
+function funcA(m,n) {
+    return m * n;
+}
+
+function funcB(m,n) {
+    return funcA(m,n);
+}
+
+function getResult(num1, num2) {
+    return funcB(num1, num2)
+}
+
+var res = getResult(5,6);
+
+console.log(res); // 30
+
+In this example, the JS engine creates a global execution context that enters the creation phase.
+
+First it allocates memory for funcA, funcB, the getResult function, and the res variable. Then it invokes getResult(), which will be pushed on the call stack.
+
+Then getResult() will call funcB(). At this point, funcB's context will be stored on the top of the stack. Then it will start executing and call another function funcA(). Similarly, funcA's context will be pushed.
+
+Once execution of each function is done, it will be removed from the call stack.
+
+Call Stack
+
+The call stack has its own fixed size depending on the system or browser. If the number of contexts exceeds the limit, then a stack overflow error will occur. This happens with a recursive function that has no base condition.
+
+*Q5. What is the event loop in JavaScript runtimes?*
+
+The event loop lets a JavaScript agent coordinate asynchronous operations without blocking its currently executing stack. Each agent runs one JavaScript job at a time; workers use separate agents and event loops.
+
+
