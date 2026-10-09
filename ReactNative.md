@@ -127,3 +127,267 @@ Metro Bundler does the following:
 - Handles Hot Reloading during development.
 
 *Q3. What is React Native and how does it differ from React?*
+
+React Native extends the award-winning React library, making it possible to build native mobile applications using familiar web technologies.
+
+Differences from React
+
+- Platform Scope: React is tailored for web development, while React Native is exclusive to building iOS and Android applications.
+
+- Rendering Engine: React uses the browser's DOM for visualization, whereas React Native achieves a parallel outcome through native platform rendering.
+
+- Component Style: While most of the component-building strategies and lifecycles between React and React Native are analogous, the controls manage the considerable difference in rendering and event handling. For instance, React uses simple buttons and divs, whereas React Native leverages platform-compliant components like Button, View, and Text.
+
+- Integration with APIs: While React targets web APIs, React Native consolidates connectivity with native mobile device features and APIs. This extension makes it feasible to tap into mechanism such as Camera, GPS, and Fingerprint sensors.
+
+*Q4. What are components in React Native?*
+
+In React Native, components are building blocks that encapsulate UI and logic, making app development modular and efficient. There are two types of components: Base Components and Custom Components.
+
+# Base Components
+
+These are core UI elements provided by React Native, directly corresponding to native views or controls. They are optimized for performance and interactive consistency.
+
+- Text: Displays readable text.
+- View: A container that supports layout with styles, such as flexbox.
+- Image: Displays images.
+
+# Custom Components
+
+These are created by developers and can be composed of both base and custom components, offering a higher level of abstraction. Custom components are reusable, promote a consistent design, and streamline UI updates.
+
+Text_Example.jsx
+
+Here is the React Native code:
+
+import React from 'react';
+import { Text } from 'react-native';
+
+const CustomText = ({ children }) => (
+  <Text style={{ fontFamily: 'Roboto-Bold', color: 'darkslategray' }}>{children}</Text>
+);
+
+export default CustomText;
+
+# Component Nesting and Tree Structure
+
+React Native applications are tree-structured with multiple components nested within one another. This composition allows for consistent and quick alterations across the app. Whether it's a Text, View, or custom component, each is a node in the component tree, visually impacting the app. Devs split the UI into smaller, self-contained parts to simplify maintenance and testing.
+
+# Core Principles of Building Components
+
+1. Reusability: Both base and custom components are designed for reuse in different parts of the application, further expanding the idea of modular development.
+
+2. Autonomy: Each component should be self-sufficient, not heavily reliant on external data or functionality. This promotes easier maintenance and testing.
+
+3. UI Focus: Components should either cater to UI or some specific functionality, but never both. This separation ensures a better code structure and maintainability.
+
+4. Loose Prop Types: Custom components should generally avoid having too many mandatory props to allow for flexibility in their usage. They can, instead, rely on sensible defaults.
+
+5. Integrative Mindset: When designing components, developers must have a holistic approach, keeping in mind how everything will come together in the UI.
+
+Managing Component State
+
+State management in components revolves around keeping track of changing data within that component. It's common in interactive UIs and involves data binding and conditional rendering. In React Native, components invoke a useState hook to integrate reactive state management.
+
+*Q5. Explain the purpose of the render() function in a React Native component?*
+
+The render() function, which is mandatory for all React and React Native components, is a gateway for JSX, receiving, processing, and returning the JSX layout. This function is like a workbench where the developer prepares the visual representation.
+
+# JSX: Visual Blueprint
+
+JSX is HTML-like markup within JavaScript that provides a structured description of the visual layout. It's like a visual blueprint for the component.
+
+The render() function leverages this blueprint, converting the JSX elements into the actual visual UI components.
+
+Here's a simple example:
+
+// JSX Blueprint
+let myJSX = (
+  <View>
+    <Text>Hello, World!</Text>
+  </View>
+);
+
+// 'render()' Function
+let render = () => {
+  let uiComponent = (
+    <View>
+      <Text>Hello, World!</Text>
+    </View>
+  );
+
+  // Visual representation
+  return uiComponent;
+};
+
+# Code Maintenance
+
+Having the render() function separates declarative structure from actual evaluatives and provides a clear workflow, making the code easier to maintain and understand.
+
+# Virtual DOM Interaction
+
+React Native employs a virtual DOM to optimize and streamline UI updates. When the state or props of a component change, render() is called to ensure the virtual DOM is in sync. The virtual DOM then identifies and applies only the necessary updates to the actual UI, reducing redundancy and rendering time.
+
+# Performance Optimization: Conditional Rendering
+
+Conditional rendering, controlled by if-else, is facilitated within the render() method, allowing for context-aware UI updates that ensure sensible resource and display utilization.
+
+# Side-Effects Handling: Lifecycle Methods
+
+The render() method is just one of several lifecycle methods. Accurate handling of these methods through render() and controlled component updates ensures proper data-fetching and side-effect management.
+
+# UI Interactivity: Integrating JSX with Methods
+
+JSX elements link visual representation with the logic behind user interactions—this is powered by methods like onPress, which, again, correspond to changes in state or prop triggers, leading back to, you guessed it, the trustworthy render() function.
+
+*Q6. What is JSX and how is it used in React Native?*
+
+JSX is a syntax extension for JavaScript, especially popular in React and React Native for expressing your UI components concisely.
+
+It effectively lets you write XML-style code directly in your JavaScript files, making component definition and nesting visually intuitive.
+
+# JSX Transpiling
+
+The Babel transpiler lies at the heart of JSX functionality, converting JSX into regular JavaScript for compatibility with web and mobile platforms.
+
+*Q7. Can you list some of the core components in React Native?*
+
+# Core Components
+
+1. View: The basic container that supports layout with Flexbox.
+2. Text: For displaying text.
+3. Image: For displaying images either from the local file system or the network.
+
+# Specialized Components
+
+1. ScrollView: For displaying a scrollable list of components.
+2. Listview (deprecated): A high-performance, cross-platform list view.
+3. TextInput: An input component with optional prompts, as well as a variety of keyboard types, enabling text input.
+
+# User Interface
+
+1. Button: A UI component that enables a user to interact with the application.
+2. Picker: A dropdown list that displays a picker interface.
+
+# Basic Functionality Components
+
+1. ActivityIndicator: Displays a rotating circle, indicating that the app is busy performing an operation.
+2. Slider: Lets the user select a value by sliding the thumb on the bar.
+3. Switch: Used for the on/off state.
+
+# List Views
+
+1. FlatList: A core virtualized list component supporting both vertical and horizontal scrolls. It's memory-efficient and only renders the elements on-screen. It also supports dynamic loading.
+
+2. SectionList: Much like FlatList, but also allows you to section your data.
+
+*Q8. What is the significance of the Flexbox layout in React Native?*
+
+# Components Designed for Flexbox
+
+React Native provides specific components empowered by Flexbox, including:
+
+1. Container Components: These are Views and Touchables that house inner elements being placed using Flexbox.
+
+2. Content Components: These are core layout components that handle the arrangement of inner items. Examples include the Text component.
+
+# Core Flexbox Components
+
+1. View: The foundation of Flexbox layout in React Native
+
+2. Text: A specialized View primarily for text-related elements that supports Flexbox
+
+3. Image: A Flexbox-capable View for image elements
+
+4. ScrollView: A container for components that are larger than its size, offering various scrolling methods. It uses Flexbox to arrange these scrollable components.
+
+5. FlatList and SectionList: These specialized components efficiently render large lists and areas as per the screen's dimensions, leveraging the innate performance of the native interface.
+
+6. VirtualizedList: A low-level, high-performance list. Both FlatList and SectionList are built on top of VirtualizedList.
+
+# Flexbox Properties in React Native
+
+1. Direction: Establishes the principal axis of the layout. Options are row and column, with the latter being the default.
+
+2. Alignment: Determines the position of items along the secondary axis. Common settings include flex-start, center, and flex-end. The setting stretch is also available, which extends the components to fill the empty space.
+
+3. Order: Flexbox allows for reordering of elements. This property defines the display order, with the default being 0.
+
+4. Proportional Sizing: Rather than specifying explicit dimensions, items can be sized proportionally to the remaining space, making the layout adaptable to various screen sizes.
+
+5. Gutters: Flexbox in React Native can handle gutters between items effortlessly.
+
+export default function App() {
+  return (
+    <View style={styles.container}>
+      <View style={styles.box} />
+      <View style={styles.box} />
+      <View style={styles.box} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+  },
+  box: {
+    width: 50,
+    height: 50,
+    backgroundColor: 'lightgrey',
+  },
+});
+
+*Q9. Explain the concept of hot reloading in React Native.*
+
+Hot Reloading innovatively speeds up the development process by rendering updates to the running app in real-time. While preserving the app's current state, it allows developers to observe changes in layout, live.
+
+# Key Benefits
+
+- Enhanced Productivity: Avoiding repetitive recompilations and reinstalls.
+- Quick Updates: View real-time changes with contextual data.
+- Error Localization: Identify issues when and where they occur.
+
+# Mechanism
+
+- State Retention: Unlike a full reload, hot reloading keeps the app's state intact.
+- Partial Update: Only files that have been changed are updated, reducing the time needed.
+
+if (__DEV__) {
+    const { activateKeepAwake } = require('expo-keep-awake');
+    activateKeepAwake();
+}
+
+*Q10. What is a TouchableHighlight in React Native?*
+
+TouchableHighlight is a React Native component optimized for touch interactions. It uses the platform's native feedback effect when touched, making it ideal for buttons, tabs, or other interactive elements.
+
+# Key Features
+
+- Accessibility: It automatically handles accessibility states such as focus and press, adhering to WAI-ARIA and native mobile accessibility guidelines.
+
+- Visual Feedback: Upon touch, it provides a visual indication like opacity changes or highlighting, depending on the platform.
+
+- On Press Event: Executes a function when the component is pressed or activated using keyboard or assistive devices.
+
+
+import { TouchableHighlight, Text, View } from 'react-native';
+
+const CustomButton = ({ label }) => (
+  <TouchableHighlight
+    style={{ backgroundColor: 'green', padding: 10, margin: 10, borderRadius: 5 }}
+    underlayColor="lime"
+    onPress={() => alert('Button pressed!')}
+  >
+    <Text style={{ color: 'white' }}>{label}</Text>
+  </TouchableHighlight>
+);
+
+const App = () => (
+  <View>
+    <CustomButton label="Press me!" />
+  </View>
+);
