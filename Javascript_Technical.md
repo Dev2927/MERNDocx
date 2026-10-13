@@ -542,3 +542,86 @@ Deconstructing the above:
 
 It may not be obvious, but Array.prototype.push.apply(arr1, arr2) mutates arr1. It's clearer to call methods using the OOP-centric way instead where possible.
 
+*Q11. Event loop, microtasks and macrotasks. Predict the output order of a snippet mixing setTimeout, Promise.then, queueMicrotask, async/await and process.nextTick. Why do microtasks run before the next macrotask, and how can a microtask loop starve rendering?*
+
+In JavaScript, the event loop coordinates synchronous code, asynchronous callbacks, and promise resolution. Understanding the execution order is important in React Native because blocking the JavaScript thread or continuously scheduling microtasks can delay user interactions and rendering.
+
+**First, I understand the different queues.** Synchronous code executes first on the current call stack. After the stack finishes, JavaScript processes microtasks, such as `Promise.then()`, `queueMicrotask()`, and the continuation after `await` when its promise resolves. Timer callbacks, such as `setTimeout()`, are scheduled for later execution through the runtime's task or timer mechanism.
+
+`process.nextTick()` is specific to Node.js. Its callbacks normally run before the regular promise microtask queue in Node.js, but it is not a standard browser or React Native API. Therefore, I distinguish Node.js event-loop behaviour from React Native's JavaScript runtime rather than assuming that every environment follows exactly the same rules.
+
+**Second, consider this example in a Node.js environment:**
+
+```javascript
+console.log('1: Start');
+
+setTimeout(() => {
+  console.log('2: Timeout');
+}, 0);
+
+Promise.resolve().then(() => {
+  console.log('3: Promise');
+});
+
+queueMicrotask(() => {
+  console.log('4: QueueMicrotask');
+});
+
+process.nextTick(() => {
+  console.log('5: NextTick');
+});
+
+async function run() {
+  console.log('6: Async start');
+  await Promise.resolve();
+  console.log('7: Async end');
+}
+
+run();
+
+console.log('8: End');
+```
+
+The expected output in a standard modern Node.js environment is:
+
+```text
+1: Start
+6: Async start
+8: End
+5: NextTick
+3: Promise
+4: QueueMicrotask
+7: Async end
+2: Timeout
+```
+
+The reasoning is as follows:
+
+- **Synchronous execution:** `Start`, `Async start`, and `End` execute immediately. Calling an async function runs its synchronous portion until it reaches `await`.
+- **Next-tick queue:** After the current synchronous execution completes, Node.js processes `process.nextTick()` callbacks before draining the regular promise microtask queue in this example.
+- **Promise microtasks:** The promise callback and `queueMicrotask()` callback run in their scheduling order. The resolved promise awaited by `run()` schedules its continuation as a microtask when execution reaches `await`.
+- **Timer callback:** The `setTimeout()` callback runs later, after the synchronous execution and relevant microtasks have completed.
+
+The exact ordering of `process.nextTick()` and promise callbacks depends on where they are scheduled and the runtime context. For example, callbacks scheduled inside an existing microtask can produce different relative ordering, so I would not apply this example as a universal rule to every Node.js scenario.
+
+**Third, why do microtasks run before the next macrotask?** After a synchronous task completes, JavaScript normally drains the microtask queue before moving to another task, such as a timer callback. This ensures that promise continuations and other queued microtasks can complete their current chain of work before the runtime proceeds to later tasks.
+
+In React Native, the precise scheduling details also depend on the JavaScript engine and native runtime integration, so I avoid treating browser, Node.js, and React Native scheduling as completely interchangeable.
+
+**Fourth, how can a microtask loop starve rendering?** Consider this example:
+
+```javascript
+function repeatForever() {
+  queueMicrotask(repeatForever);
+}
+
+repeatForever();
+```
+
+Each microtask schedules another microtask. Because the queue never becomes empty, the runtime may never reach a point where it can process other tasks normally. In a UI application, this can prevent the JavaScript thread from handling button presses, processing timers, or completing JavaScript-driven updates. Rendering may become delayed, and the application can appear frozen.
+
+To avoid this, I do not schedule unbounded microtask chains. For large data-processing tasks, I divide work into smaller batches and yield to the runtime between batches, or move CPU-intensive work to an appropriate background execution mechanism. Simply replacing a loop with promises does not make the computation non-blocking.
+
+**Finally, in a React Native interview, I connect this concept to practical performance.** If an API response contains thousands of records, parsing and processing the entire response synchronously can block JavaScript. Likewise, an endless promise chain can delay interaction handling even though the code appears asynchronous. I profile the operation, reduce unnecessary work, process data in manageable batches, and ensure the JavaScript thread has opportunities to handle user events.
+
+Overall, the key distinction is that **asynchronous does not automatically mean non-blocking**. Microtasks generally run before the next regular task, and excessive microtask scheduling can starve other work, including UI-related JavaScript execution.

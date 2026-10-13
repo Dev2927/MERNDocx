@@ -599,3 +599,6 @@ Reserve useLayoutEffect for layout reads or writes that must complete in the sam
 useInsertionEffect
 
 useInsertionEffect runs before layout effects so CSS-in-JS libraries can inject <style> tags before layout is read. It may run before or after the DOM itself is updated, refs are not attached yet, and it cannot update state. Application code should almost never use it; reach for useEffect or useLayoutEffect first.
+
+*Q11. Reconciliation and the virtual DOM. How does React’s diffing algorithm decide what to update (element type, key, same-position comparison)? Why do index keys cause bugs in reorderable lists with inputs, and what does React Fiber change compared to the old stack reconciler?*
+
