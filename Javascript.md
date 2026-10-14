@@ -3046,3 +3046,2090 @@ useEffect(() => () => debouncedSearch.cancel(), [debouncedSearch]);
 
 *Q23. Polyfilling array methods. Write polyfills for map, filter, reduce (including the no-initial-value case and sparse arrays) and flat. Why does reduce on an empty array without an initial value throw, and how do forEach, for...of and for...in differ on arrays?*
 
+## Polyfilling Array Methods: `map`, `filter`, `reduce`, and `flat`
+
+A polyfill is a custom implementation of a JavaScript feature that provides similar functionality when the native implementation is unavailable. When writing polyfills for array methods, we need to consider callback arguments, sparse arrays, edge cases, and the original method's behavior.
+
+### 1. Polyfill for `map()`
+
+The `map()` method transforms each existing element of an array and returns a new array of the same length. It does not modify the original array, and it skips empty slots in sparse arrays.
+
+```javascript
+Array.prototype.myMap = function (callback, thisArg) {
+    if (this == null) {
+        throw new TypeError("Array is null or undefined");
+    }
+
+    if (typeof callback !== "function") {
+        throw new TypeError("Callback must be a function");
+    }
+
+    const arr = Object(this);
+    const result = new Array(arr.length);
+
+    for (let i = 0; i < arr.length; i++) {
+        if (i in arr) {
+            result[i] = callback.call(
+                thisArg,
+                arr[i],
+                i,
+                arr
+            );
+        }
+    }
+
+    return result;
+};
+
+// Example
+const numbers = [1, 2, 3];
+
+const doubled = numbers.myMap(num => num * 2);
+
+console.log(doubled); // [2, 4, 6]
+console.log(numbers); // [1, 2, 3]
+```
+
+**Explanation:** I use `Object(this)` to support array-like objects, and `new Array(arr.length)` to preserve the original length. The `i in arr` check ensures that empty slots are skipped rather than treated as `undefined`. The callback receives the current element, index, and original array.
+
+### 2. Polyfill for `filter()`
+
+The `filter()` method creates a new array containing only the elements for which the callback returns a truthy value. Unlike `map()`, the resulting array can have fewer elements than the original.
+
+```javascript
+Array.prototype.myFilter = function (callback, thisArg) {
+    if (this == null) {
+        throw new TypeError("Array is null or undefined");
+    }
+
+    if (typeof callback !== "function") {
+        throw new TypeError("Callback must be a function");
+    }
+
+    const arr = Object(this);
+    const result = [];
+
+    for (let i = 0; i < arr.length; i++) {
+        if (i in arr) {
+            if (callback.call(thisArg, arr[i], i, arr)) {
+                result.push(arr[i]);
+            }
+        }
+    }
+
+    return result;
+};
+
+// Example
+const numbers = [1, 2, 3, 4, 5];
+
+const evenNumbers = numbers.myFilter(num => num % 2 === 0);
+
+console.log(evenNumbers); // [2, 4]
+```
+
+**Explanation:** I iterate through the array, skip missing indices, and push an element into the result only when the callback returns a truthy value. The original array remains unchanged.
+
+### 3. Polyfill for `reduce()`
+
+The `reduce()` method processes an array and combines its elements into a single accumulated result. The important edge case is handling the optional initial value correctly.
+
+```javascript
+Array.prototype.myReduce = function (callback, initialValue) {
+    if (this == null) {
+        throw new TypeError("Array is null or undefined");
+    }
+
+    if (typeof callback !== "function") {
+        throw new TypeError("Callback must be a function");
+    }
+
+    const arr = Object(this);
+    const length = arr.length;
+
+    let accumulator;
+    let i = 0;
+
+    if (arguments.length >= 2) {
+        accumulator = initialValue;
+    } else {
+        while (i < length && !(i in arr)) {
+            i++;
+        }
+
+        if (i >= length) {
+            throw new TypeError(
+                "Reduce of empty array with no initial value"
+            );
+        }
+
+        accumulator = arr[i];
+        i++;
+    }
+
+    for (; i < length; i++) {
+        if (i in arr) {
+            accumulator = callback(
+                accumulator,
+                arr[i],
+                i,
+                arr
+            );
+        }
+    }
+
+    return accumulator;
+};
+
+// Example 1: With initial value
+console.log([1, 2, 3, 4].myReduce(
+    (sum, num) => sum + num,
+    0
+)); // 10
+
+// Example 2: Without initial value
+console.log([1, 2, 3, 4].myReduce(
+    (sum, num) => sum + num
+)); // 10
+
+// Example 3: Empty array
+console.log([].myReduce((sum, num) => sum + num, 0)); // 0
+```
+
+**Explanation:** First, I check whether an initial value was actually supplied by using `arguments.length >= 2`. This is important because `undefined` can itself be a valid initial value.
+
+If no initial value is supplied, I search for the first existing element and use it as the accumulator. I then start iteration from the next index. The `i in arr` check ensures that sparse-array holes are skipped.
+
+**Why does `reduce()` throw on an empty array without an initial value?**
+
+Because there is no first element to use as the accumulator, and there is no initial value to provide one. JavaScript cannot determine a valid starting accumulator, so it throws a `TypeError`.
+
+The same error occurs when the array contains only empty slots and no initial value is provided. However, an initial value such as `0` allows reduction to proceed even when the array is empty.
+
+### 4. Polyfill for `flat()`
+
+The `flat()` method creates a new array by flattening nested arrays up to a specified depth. Its default depth is `1`.
+
+```javascript
+Array.prototype.myFlat = function (depth = 1) {
+    if (this == null) {
+        throw new TypeError("Array is null or undefined");
+    }
+
+    const result = [];
+
+    function flatten(arr, currentDepth) {
+        for (let i = 0; i < arr.length; i++) {
+            // Skip holes in sparse arrays
+            if (!(i in arr)) {
+                continue;
+            }
+
+            const value = arr[i];
+
+            if (Array.isArray(value) && currentDepth > 0) {
+                flatten(value, currentDepth - 1);
+            } else {
+                result.push(value);
+            }
+        }
+    }
+
+    flatten(Object(this), Math.max(0, Math.floor(depth)));
+
+    return result;
+};
+
+// Example 1
+console.log([1, [2, [3, 4]]].myFlat());
+// [1, 2, [3, 4]]
+
+// Example 2
+console.log([1, [2, [3, 4]]].myFlat(2));
+// [1, 2, 3, 4]
+
+// Example 3: Flatten completely
+console.log([1, [2, [3, 4]]].myFlat(Infinity));
+// Note: this basic implementation needs an adjustment
+// to support Infinity safely.
+```
+
+**Explanation:** I use recursion to flatten nested arrays. Each time I enter a nested array, I decrease the remaining depth. When the depth reaches zero, I preserve the nested array instead of flattening it further. I also skip sparse-array holes.
+
+This is a simplified interview implementation. A fully specification-compatible `flat()` polyfill must handle `Infinity` without reducing it, as well as array-like inputs and additional edge cases.
+
+### 5. Difference between `forEach()`, `for...of`, and `for...in`
+
+These three iteration approaches behave differently, especially when dealing with sparse arrays.
+
+**`forEach()`**
+
+- Executes a callback for each existing array element.
+- Skips empty slots in sparse arrays.
+- Provides the value, index, and original array to the callback.
+- Does not support `break` or `continue` directly.
+- Does not return a new transformed array; its return value is `undefined`.
+
+```javascript
+const arr = [10, 20, 30];
+
+arr.forEach((value, index) => {
+    console.log(index, value);
+});
+```
+
+**`for...of`**
+
+- Iterates over the values produced by the array's iterator.
+- Supports `break` and `continue`.
+- On a sparse array, an empty slot is normally yielded as `undefined`.
+- Does not directly provide the index; use `entries()` when the index is needed.
+
+```javascript
+const arr = [10, 20, 30];
+
+for (const value of arr) {
+    console.log(value);
+}
+
+for (const [index, value] of arr.entries()) {
+    console.log(index, value);
+}
+```
+
+**`for...in`**
+
+- Iterates over enumerable property keys, which are strings.
+- Can include custom properties and inherited enumerable properties.
+- Does not guarantee the array's intended numeric iteration order in the same way array iteration methods do.
+- Is generally not recommended for iterating over array values.
+
+```javascript
+const arr = [10, 20, 30];
+arr.extra = "test";
+
+for (const key in arr) {
+    console.log(key, arr[key]);
+}
+
+// May include:
+// "0" 10
+// "1" 20
+// "2" 30
+// "extra" "test"
+```
+
+For a sparse array such as `const arr = [10, , 30]`, `forEach()` skips the hole, `for...of` yields `undefined` for it, and `for...in` normally skips it because the missing index is not an enumerable property.
+
+### Interview conclusion
+
+My key considerations when implementing array-method polyfills are preserving native behavior, handling sparse arrays correctly, validating callbacks, and accounting for edge cases such as `reduce()` without an initial value. In production, I would generally use native array methods rather than custom polyfills unless compatibility requirements or a specific runtime limitation justified implementing them.
+
+*Q24. Event propagation and delegation. Explain capturing, target and bubbling phases. How does event delegation work, and what are its trade-offs? What do stopPropagation, stopImmediatePropagation and preventDefault each do, and which events don’t bubble (focus, blur)?*
+
+Event propagation is the process by which an event travels through the DOM when a user interacts with an element. In JavaScript, event propagation has three phases: **capturing, target, and bubbling**.
+
+### 1. Capturing, Target, and Bubbling Phases
+
+Suppose we have a button inside a div, which is inside the body. When the user clicks the button, the event travels through these phases:
+
+1. **Capturing phase:** The event travels from the document or outer ancestors down toward the target element. We enable this phase by passing `true` or `{ capture: true }` to `addEventListener()`.
+2. **Target phase:** The event reaches the actual element that triggered it, such as the button.
+3. **Bubbling phase:** After reaching the target, the event propagates back up through its ancestors, provided the event supports bubbling.
+
+```javascript
+const parent = document.querySelector("#parent");
+const child = document.querySelector("#child");
+
+parent.addEventListener(
+    "click",
+    () => console.log("Parent - Capturing"),
+    true
+);
+
+child.addEventListener(
+    "click",
+    () => console.log("Child - Target")
+);
+
+parent.addEventListener(
+    "click",
+    () => console.log("Parent - Bubbling")
+);
+```
+
+If I click the child button, the output is:
+
+```text
+Parent - Capturing
+Child - Target
+Parent - Bubbling
+```
+
+The important point is that capturing listeners run while the event travels downward, whereas bubbling listeners run while it travels upward. By default, `addEventListener()` registers a bubbling-phase listener because `capture` defaults to `false`.
+
+### 2. What Is Event Delegation?
+
+Event delegation is a technique where I attach a single event listener to a parent element instead of attaching separate listeners to every child. It works primarily through event bubbling.
+
+For example, imagine a list containing hundreds of dynamically generated items. Instead of adding a click listener to every item, I can attach one listener to the parent list and identify which item was clicked.
+
+```html
+<ul id="userList">
+    <li data-id="101">User One</li>
+    <li data-id="102">User Two</li>
+    <li data-id="103">User Three</li>
+</ul>
+```
+
+```javascript
+const userList = document.querySelector("#userList");
+
+userList.addEventListener("click", (event) => {
+    const item = event.target.closest("li[data-id]");
+
+    if (!item || !userList.contains(item)) {
+        return;
+    }
+
+    console.log("Selected user:", item.dataset.id);
+});
+```
+
+**How it works:**
+
+When I click a list item, the click event bubbles up to the `ul`. The handler uses `event.target` to identify the original clicked element and `closest()` to find the relevant list item. This also works if the user clicks a nested element inside the list item.
+
+Event delegation is especially useful for dynamic lists because newly added items automatically work with the existing listener. I do not need to attach another listener every time an item is created.
+
+### 3. Advantages and Trade-offs of Event Delegation
+
+**Advantages:**
+
+- **Fewer event listeners:** Reduces the number of individual listeners for large collections of elements.
+- **Dynamic elements:** Handles newly added children without requiring additional listener registration.
+- **Centralized logic:** Keeps related event handling in one place.
+- **Simpler lifecycle management:** Can reduce the need to attach and remove listeners as individual elements are created and destroyed.
+
+**Trade-offs:**
+
+- **Event target handling:** I must identify the correct child using `event.target`, `closest()`, or another appropriate selector.
+- **Bubbling dependency:** Delegation using bubbling does not work directly for events that do not bubble.
+- **Unrelated events:** Events originating from nested or unrelated elements may reach the parent, so the handler needs appropriate checks.
+- **Performance considerations:** Delegation is not automatically faster in every situation. A parent handler may execute for many unrelated events, and complex selector checks can add overhead.
+- **Propagation interference:** If another handler calls `stopPropagation()` before the event reaches the delegated ancestor, the delegated handler may not execute.
+
+In practice, I use event delegation for large or dynamic lists, tables, menus, and similar components. For a small number of independent controls, direct listeners are often simpler and easier to maintain.
+
+### 4. `stopPropagation()` vs. `stopImmediatePropagation()` vs. `preventDefault()`
+
+These methods serve different purposes, and an important interview distinction is that **stopping propagation is not the same as preventing the browser's default action**.
+
+**`stopPropagation()`**
+
+Stops the event from continuing to propagate to other nodes in the propagation path. For example, it can prevent a click from bubbling from a child to its parent.
+
+```javascript
+child.addEventListener("click", (event) => {
+    event.stopPropagation();
+    console.log("Child clicked");
+});
+```
+
+The child handler executes, but the click does not continue to the parent through the normal propagation path. However, other listeners on the same element can still execute.
+
+**`stopImmediatePropagation()`**
+
+Stops further propagation and also prevents other listeners for the same event on the same element from executing, including listeners registered later.
+
+```javascript
+child.addEventListener("click", (event) => {
+    event.stopImmediatePropagation();
+    console.log("First handler");
+});
+
+child.addEventListener("click", () => {
+    console.log("Second handler");
+});
+```
+
+Under these conditions, only `First handler` is logged. This method is stronger than `stopPropagation()` because it stops subsequent listeners on the current target as well as propagation to other nodes.
+
+**`preventDefault()`**
+
+Prevents the browser's default action associated with an event, provided the event is cancelable and the listener is not passive. It does not stop propagation.
+
+For example, I can prevent a form from submitting normally and handle the submission with JavaScript:
+
+```javascript
+const form = document.querySelector("#loginForm");
+
+form.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    console.log("Handle login with JavaScript");
+});
+```
+
+The browser's normal form submission is prevented, but the event can still propagate to ancestor elements.
+
+Here is the distinction:
+
+| Method | Stops propagation | Stops other listeners on the same target | Prevents default browser action |
+|---|---|---|---|
+| `stopPropagation()` | Yes | No | No |
+| `stopImmediatePropagation()` | Yes | Yes, subsequent listeners | No |
+| `preventDefault()` | No | No | Yes, when cancelable |
+
+### 5. Which Events Do Not Bubble? What About `focus` and `blur`?
+
+Some DOM events do not bubble. Two important examples are `focus` and `blur`.
+
+- **`focus`:** Fires when an element receives focus, but does not bubble.
+- **`blur`:** Fires when an element loses focus, but does not bubble.
+- **`focusin`:** Similar to `focus`, but bubbles.
+- **`focusout`:** Similar to `blur`, but bubbles.
+
+This distinction matters when implementing event delegation for form fields.
+
+For example, if I attach a `focus` listener to a parent form, it will not receive bubbling `focus` events from its child inputs. Instead, I can use `focusin`:
+
+```javascript
+const form = document.querySelector("#loginForm");
+
+form.addEventListener("focusin", (event) => {
+    if (event.target.matches("input")) {
+        console.log("Input focused:", event.target.name);
+    }
+});
+
+form.addEventListener("focusout", (event) => {
+    if (event.target.matches("input")) {
+        console.log("Input blurred:", event.target.name);
+    }
+});
+```
+
+This allows the parent form to handle focus changes for multiple inputs, including dynamically added inputs.
+
+Another option is to register `focus` or `blur` listeners on an ancestor using the capturing phase:
+
+```javascript
+form.addEventListener(
+    "focus",
+    (event) => {
+        console.log("Focused element:", event.target);
+    },
+    true
+);
+```
+
+Although `focus` does not bubble, the capturing phase can still allow an ancestor's capture listener to observe the event.
+
+Other commonly discussed non-bubbling events include `mouseenter`, `mouseleave`, `load`, and `unload`, although exact propagation behavior depends on the specific event and target.
+
+### Interview Conclusion
+
+Event propagation describes how events travel through the DOM's capturing, target, and bubbling phases. Event delegation uses propagation to handle events from multiple child elements through a shared ancestor, making it particularly useful for dynamic UI components. I also distinguish propagation control from default-action cancellation: `stopPropagation()` stops movement through the DOM, `stopImmediatePropagation()` additionally blocks subsequent listeners on the same target, and `preventDefault()` cancels a browser action without stopping propagation.
+
+*Q25. Property descriptors, getters/setters and Proxy. What do writable, enumerable and configurable control? How do Object.defineProperty and Proxy/Reflect differ for building reactive state, validation or logging, and what are the performance and invariants caveats of Proxy?*
+
+In JavaScript, property descriptors control how object properties behave. Getters and setters allow us to define custom logic when a property is accessed or modified, while `Proxy` allows us to intercept operations on an object, such as reading, writing, deleting, or checking properties.
+
+As a developer, I use these concepts when implementing validation, encapsulation, reactive state, logging, or controlled access to object properties.
+
+### 1. What are `writable`, `enumerable`, and `configurable`?
+
+JavaScript properties have descriptors that define their behavior. For a data property, the three important flags are:
+
+- **`writable`:** Determines whether the property's value can be changed through normal assignment.
+- **`enumerable`:** Determines whether the property appears in operations such as `Object.keys()` and `for...in`.
+- **`configurable`:** Determines whether the property can be deleted or reconfigured, including changing its descriptor or converting between data and accessor properties.
+
+```javascript
+const user = {};
+
+Object.defineProperty(user, "name", {
+    value: "Dev",
+    writable: false,
+    enumerable: true,
+    configurable: false
+});
+
+user.name = "Rahul";
+
+console.log(user.name);         // "Dev"
+console.log(Object.keys(user)); // ["name"]
+
+delete user.name;
+
+console.log(user.name);         // "Dev"
+```
+
+Here, `name` cannot be changed through normal assignment, is included in enumerable property listings, and cannot be deleted or reconfigured.
+
+In non-strict mode, assigning to a non-writable property generally fails silently. In strict mode, it throws a `TypeError`.
+
+One important detail is that when I create a property using `Object.defineProperty()`, the omitted flags default to `false`. This differs from ordinary assignment, which normally creates writable, enumerable, and configurable properties.
+
+### 2. What is `Object.defineProperty()`?
+
+`Object.defineProperty()` lets me define or modify a specific property with a descriptor. It is useful when I need precise control over property access, mutability, or validation.
+
+For example, I can validate a user's age before accepting a value:
+
+```javascript
+const user = {};
+
+Object.defineProperty(user, "age", {
+    enumerable: true,
+    configurable: true,
+
+    get() {
+        return this._age;
+    },
+
+    set(value) {
+        if (!Number.isInteger(value) || value < 0) {
+            throw new TypeError("Age must be a non-negative integer");
+        }
+
+        this._age = value;
+    }
+});
+
+user.age = 25;
+
+console.log(user.age); // 25
+
+user.age = -5; // TypeError
+```
+
+Here, `get()` executes when I read `user.age`, while `set()` executes when I assign a value to it. The setter validates the input before updating the internal `_age` property.
+
+This is called an **accessor property**. Unlike a data property, it uses getter and setter functions rather than a `value` and `writable` flag.
+
+I would also be careful about exposing `_age` directly because the underscore is only a naming convention, not actual privacy. For stronger encapsulation, I could use a private class field such as `#age` or a closure.
+
+### 3. What is a `Proxy`?
+
+A `Proxy` creates a wrapper around an existing object and intercepts operations performed on that object through a set of handler methods called traps.
+
+Common traps include:
+
+- `get`: Intercepts property reads.
+- `set`: Intercepts property assignments.
+- `deleteProperty`: Intercepts property deletion.
+- `has`: Intercepts the `in` operator.
+- `ownKeys`: Intercepts operations that retrieve property keys.
+- `defineProperty`: Intercepts property definition.
+
+For example, I can validate property assignments without defining a separate setter for every property:
+
+```javascript
+const user = {
+    name: "Dev",
+    age: 24
+};
+
+const userProxy = new Proxy(user, {
+    set(target, property, value, receiver) {
+        if (property === "age") {
+            if (!Number.isInteger(value) || value < 0) {
+                throw new TypeError("Invalid age");
+            }
+        }
+
+        return Reflect.set(
+            target,
+            property,
+            value,
+            receiver
+        );
+    }
+});
+
+userProxy.age = 25;
+
+console.log(userProxy.age); // 25
+
+userProxy.age = -5; // TypeError
+```
+
+The `set` trap intercepts the assignment, validates the value, and delegates the actual operation to `Reflect.set()`. If validation fails, the assignment is rejected.
+
+An important detail is that the original `user` object is not automatically protected from direct access. If someone executes `user.age = -5`, they bypass the proxy. Therefore, all relevant access must go through the proxy for this validation strategy to be effective.
+
+### 4. How do `Proxy` and `Reflect` work together?
+
+`Proxy` intercepts operations, whereas `Reflect` provides methods that perform the corresponding standard object operations.
+
+For example, `Reflect.get()` reads a property, `Reflect.set()` writes a property, and `Reflect.deleteProperty()` deletes a property.
+
+```javascript
+const target = {
+    name: "Dev"
+};
+
+const proxy = new Proxy(target, {
+    get(target, property, receiver) {
+        console.log(`Reading: ${String(property)}`);
+
+        return Reflect.get(target, property, receiver);
+    },
+
+    set(target, property, value, receiver) {
+        console.log(`Writing: ${String(property)}`);
+
+        return Reflect.set(
+            target,
+            property,
+            value,
+            receiver
+        );
+    }
+});
+
+console.log(proxy.name);
+// Reading: name
+// Dev
+
+proxy.name = "Anand";
+// Writing: name
+```
+
+Using `Reflect` is generally preferable to directly accessing `target[property]` or assigning `target[property] = value` inside traps because it preserves standard operation semantics and provides consistent success or failure results.
+
+For example, `Reflect.set()` returns a boolean indicating whether the assignment succeeded. It also accepts a receiver, which matters for inherited properties and accessor behavior.
+
+### 5. How would I use `Proxy` to implement reactive state?
+
+A basic reactive system can use a proxy to detect property changes and notify subscribers. Frameworks use more sophisticated versions of this idea to track dependencies and schedule updates.
+
+```javascript
+function reactive(target, onChange) {
+    return new Proxy(target, {
+        set(target, property, value, receiver) {
+            const oldValue = Reflect.get(
+                target,
+                property,
+                receiver
+            );
+
+            const success = Reflect.set(
+                target,
+                property,
+                value,
+                receiver
+            );
+
+            if (
+                success &&
+                !Object.is(oldValue, value)
+            ) {
+                onChange({
+                    property,
+                    oldValue,
+                    newValue: value
+                });
+            }
+
+            return success;
+        }
+    });
+}
+
+const state = reactive(
+    { count: 0 },
+    ({ property, oldValue, newValue }) => {
+        console.log(
+            `${String(property)} changed from ${oldValue} to ${newValue}`
+        );
+    }
+);
+
+state.count = 1;
+// count changed from 0 to 1
+
+state.count = 1;
+// No notification because the value did not change
+```
+
+In this example, the proxy intercepts writes, compares the old and new values, and notifies the callback only when a successful assignment changes the value.
+
+However, this is only a basic reactive implementation. It does not automatically track which components depend on which properties, and it does not observe mutations inside nested objects unless those objects are also made reactive. A production reactive system would also need dependency tracking, nested proxy handling, array behavior, deletion detection, and update scheduling.
+
+### 6. `Object.defineProperty()` vs. `Proxy`
+
+| Feature | `Object.defineProperty()` | `Proxy` |
+|---|---|---|
+| Interception | Individual property accessors or descriptor changes | Many operations on an object |
+| Existing properties | Requires defining accessors or changing descriptors | Can intercept reads and writes without redefining each property |
+| New properties | Does not automatically observe newly added properties | Can intercept additions through the `set` trap |
+| Deletion tracking | No general deletion interceptor | Supports `deleteProperty` |
+| Property validation | Implemented in setters | Implemented in traps |
+| Reactive systems | Useful for individual properties | Useful for broader object-level reactivity |
+| Object identity | Keeps the same object identity | Creates a distinct wrapper identity |
+
+For example, `Object.defineProperty()` is appropriate when I want a controlled accessor for a particular property. `Proxy` is more flexible when I want to intercept multiple operations across an object, including properties that are added later.
+
+Neither approach automatically provides complete validation or reactivity. The implementation must still account for nested objects, access paths, and bypasses.
+
+### 7. What are the performance caveats of `Proxy`?
+
+A proxy introduces an additional layer between the caller and the target object. Operations that trigger traps can incur overhead compared with direct property access, particularly when many property reads or writes happen in performance-critical loops.
+
+The impact depends on the JavaScript engine, the operation, and the complexity of the traps. I would not assume every proxy is slow, but I would avoid creating unnecessary proxies or doing expensive work inside frequently executed traps.
+
+My practical considerations are:
+
+- Keep traps lightweight and avoid unnecessary allocations or logging in hot paths.
+- Cache proxies for nested objects instead of creating a new proxy on every read.
+- Avoid repeatedly wrapping the same object without a clear identity strategy.
+- Profile the real workload before replacing a simpler implementation with a proxy-based one.
+- Consider compatibility and debugging requirements when using proxies in older runtimes.
+
+### 8. What are Proxy invariants, and why do they matter?
+
+Proxy traps must obey JavaScript's object invariants. A proxy cannot report arbitrary behavior that contradicts certain non-configurable properties or the target object's extensibility rules.
+
+For example, a `get` trap cannot return a different value for a non-configurable, non-writable own data property on the target.
+
+```javascript
+const target = {};
+
+Object.defineProperty(target, "id", {
+    value: 100,
+    writable: false,
+    configurable: false
+});
+
+const proxy = new Proxy(target, {
+    get(target, property) {
+        if (property === "id") {
+            return 200;
+        }
+
+        return Reflect.get(target, property);
+    }
+});
+
+console.log(proxy.id); // TypeError
+```
+
+The proxy attempts to return `200`, but the target has a non-configurable, non-writable `id` property whose actual value is `100`. JavaScript throws a `TypeError` because the trap violates the proxy invariant.
+
+Other traps also have invariants. For example, `ownKeys` must respect non-configurable properties, and `set` cannot successfully claim that it changed a protected non-writable property to a different value.
+
+This matters because a proxy is not an unrestricted way to redefine JavaScript's object semantics. Its traps must remain consistent with the target's fundamental constraints.
+
+### Interview Conclusion
+
+I would use `Object.defineProperty()` when I need precise control over individual properties through descriptors, getters, and setters. I would use `Proxy` when I need to intercept broader object operations for validation, logging, or reactive state management. `Reflect` helps delegate those operations while preserving standard JavaScript semantics.
+
+For production code, I would also consider proxy overhead, nested object handling, object identity, direct access to the original target, and proxy invariants. The right choice depends on whether I need property-level control or object-level interception.
+
+*Q26. Garbage collection and memory leaks. How does mark-and-sweep work, and why is reference counting insufficient? Name common leak sources (detached DOM nodes, forgotten intervals and listeners, accidental globals, unbounded caches) and how you’d find one with Chrome DevTools heap snapshots.*
+
+Garbage collection is the process by which the JavaScript engine automatically identifies and releases memory that is no longer reachable by the application. JavaScript developers do not normally allocate and free memory manually, but we still need to manage references properly to avoid memory leaks.
+
+### 1. How does Mark-and-Sweep garbage collection work?
+
+JavaScript engines such as V8 use garbage collection techniques based primarily on reachability, including mark-and-sweep.
+
+The process works in two main phases:
+
+1. **Mark phase:** The garbage collector starts from a set of roots, such as global objects, active function call stacks, and other engine-managed references. It traverses reachable objects and marks them as live.
+2. **Sweep phase:** The collector identifies objects that were not marked as reachable and reclaims their memory.
+
+For example:
+
+```javascript
+let user = {
+    name: "Dev",
+    profile: {
+        age: 24
+    }
+};
+
+user = null;
+```
+
+Initially, the `user` variable references an object, which in turn references the `profile` object. When I assign `null` to `user`, these objects become eligible for garbage collection if no other reachable references point to them.
+
+The important distinction is that **an object is eligible for collection when it is no longer reachable, not simply when I stop using it logically**. If another variable or a closure still references the object, the garbage collector must preserve it.
+
+Also, garbage collection is automatic, so eligibility does not mean memory will be reclaimed immediately.
+
+### 2. Why is reference counting insufficient?
+
+Reference counting tracks how many references point to an object. When the count reaches zero, the object can potentially be reclaimed.
+
+However, reference counting alone cannot correctly collect unreachable objects that reference each other.
+
+```javascript
+let first = {};
+let second = {};
+
+first.other = second;
+second.other = first;
+
+first = null;
+second = null;
+```
+
+The two objects reference each other, so their reference counts remain nonzero even after the external references are removed.
+
+Neither object can be reached from the application's roots, but a simple reference-counting collector may fail to reclaim them.
+
+Mark-and-sweep handles this situation because it checks reachability from roots rather than relying only on reference counts.
+
+Modern JavaScript engines use more sophisticated garbage collectors, including generational and incremental techniques, to balance memory usage and application responsiveness.
+
+### 3. What are common sources of memory leaks?
+
+A memory leak occurs when an application retains objects that are no longer needed, preventing the garbage collector from reclaiming their memory.
+
+**A. Detached DOM nodes**
+
+A DOM element may be removed from the document but remain in memory because JavaScript still references it.
+
+```javascript
+let savedElement = document.querySelector("#modal");
+
+savedElement.remove();
+
+// The element can remain in memory because
+// savedElement still references it.
+```
+
+Removing an element from the DOM does not automatically release it if JavaScript still holds a reference. Once the reference is no longer needed, I should clear it.
+
+```javascript
+savedElement = null;
+```
+
+This helps only if no other reachable references retain the element.
+
+**B. Forgotten intervals and timeouts**
+
+A recurring interval can continue executing after a component or screen is no longer needed.
+
+```javascript
+const intervalId = setInterval(() => {
+    console.log("Updating data");
+}, 1000);
+
+// When the task is no longer needed:
+clearInterval(intervalId);
+```
+
+I would keep track of timer IDs and clear them during cleanup. An interval callback can also retain references to large objects through its closure.
+
+**C. Forgotten event listeners**
+
+Listeners can retain references to callbacks and objects captured by those callbacks.
+
+```javascript
+function handleResize() {
+    console.log("Window resized");
+}
+
+window.addEventListener("resize", handleResize);
+
+// During cleanup:
+window.removeEventListener("resize", handleResize);
+```
+
+I need to remove the same listener function with compatible options. Alternatively, I can use an `AbortController` and abort its signal during cleanup.
+
+This is particularly important in single-page applications, where components can mount and unmount repeatedly.
+
+**D. Accidental global variables**
+
+Creating unintended global references can keep objects alive for the lifetime of the page.
+
+```javascript
+function processData() {
+    // In non-strict mode, this can create a global.
+    accidentalData = new Array(1000000).fill("data");
+}
+```
+
+In strict mode or ES modules, this undeclared assignment throws a `ReferenceError` instead of creating a global property.
+
+I avoid this problem by declaring variables with `const` or `let`, using strict mode where applicable, and avoiding unnecessary global state.
+
+**E. Unbounded caches and collections**
+
+A cache that continuously stores objects without eviction can cause memory usage to grow indefinitely.
+
+```javascript
+const cache = new Map();
+
+function cacheResult(key, value) {
+    cache.set(key, value);
+}
+```
+
+If new keys keep being added, the map retains those entries until they are explicitly removed or the map itself becomes unreachable.
+
+For production systems, I would introduce an appropriate eviction strategy, such as a size-limited LRU cache, a time-to-live policy, or `WeakMap` when its object-key semantics fit the use case. A `WeakMap` is not a general replacement for every cache because its keys must be objects or non-registered symbols, and its entries are not enumerable.
+
+### 4. How would I find a memory leak using Chrome DevTools?
+
+I would use Chrome DevTools, particularly the Memory panel, to compare heap snapshots and identify objects that remain in memory unexpectedly.
+
+My debugging process would be:
+
+**Step 1: Reproduce the problem**
+
+I would perform the same user actions repeatedly, such as opening and closing a modal or navigating between screens. I would then check whether memory usage keeps increasing instead of stabilizing.
+
+**Step 2: Take a baseline heap snapshot**
+
+I would open Chrome DevTools, navigate to the **Memory** panel, select **Heap snapshot**, and capture the initial snapshot.
+
+This gives me a baseline for comparison.
+
+**Step 3: Repeat the suspected operation**
+
+I would repeatedly perform the action that may be leaking memory. For example, I might open and close a modal ten times or navigate away from and back to a page several times.
+
+**Step 4: Force garbage collection and take another snapshot**
+
+Where DevTools provides the option, I would trigger garbage collection before taking another snapshot. This helps distinguish objects that are temporarily awaiting collection from objects that remain reachable.
+
+**Step 5: Compare the snapshots**
+
+I would compare the snapshots and investigate objects whose counts or retained sizes continue to increase.
+
+Useful views include:
+
+- **Summary:** Groups objects by constructor and shows their counts and memory sizes.
+- **Comparison:** Shows changes between two snapshots, helping identify objects added or retained after repeated operations.
+- **Containment:** Helps inspect object relationships and understand what is retaining memory.
+- **Retainers:** Shows the reference chain keeping a selected object alive.
+
+For example, if detached DOM nodes increase every time I close a modal, I would inspect a retained node and follow its retainer chain. I might discover that a global array or event listener still holds a reference to the removed element.
+
+**Step 6: Fix the retaining reference and verify**
+
+I would remove unnecessary references, clean up listeners or timers, or introduce cache eviction. Then I would repeat the same test and capture another snapshot to verify that the retained objects no longer accumulate.
+
+I would also inspect the **Performance** panel's memory-related recordings when I need to correlate memory growth with repeated interactions and garbage collection activity.
+
+### 5. What is the difference between shallow size and retained size?
+
+This is another useful heap-snapshot concept.
+
+- **Shallow size:** The memory occupied directly by an object itself.
+- **Retained size:** The memory that could potentially be reclaimed if that object and the objects retained exclusively through it became unreachable.
+
+For example, a small global array might retain thousands of large objects. Its shallow size could be small, while its retained size could be substantial.
+
+Therefore, I would not investigate memory leaks by looking only at the largest individual objects. I would also inspect their retainers and retained sizes to identify the reference preventing collection.
+
+### Interview Conclusion
+
+Mark-and-sweep collects objects based on reachability from garbage-collection roots, which allows it to reclaim unreachable circular references that simple reference counting cannot handle.
+
+The most common JavaScript memory leaks I investigate involve detached DOM nodes, uncleared intervals, forgotten event listeners, accidental globals, and unbounded caches. In Chrome DevTools, I reproduce the issue, compare heap snapshots, inspect retained objects and their retainer chains, fix the reference or cleanup problem, and repeat the test to confirm that memory usage stabilizes.
+
+*Q27. Modern syntax and its edge cases. How do optional chaining and nullish coalescing differ from && and || (the 0, '', false cases)? What are the pitfalls of default parameters, destructuring with defaults, rest/spread on objects, and tagged template literals?*
+
+Modern JavaScript provides features such as optional chaining, nullish coalescing, default parameters, destructuring, rest/spread operators, and tagged template literals. These features make code cleaner, but in interviews, I would also explain their edge cases and how they affect runtime behavior.
+
+### 1. Optional Chaining (`?.`) vs. Logical AND (`&&`)
+
+Optional chaining safely accesses a property or calls a function when the value immediately before `?.` is `null` or `undefined`. It prevents a `TypeError` caused by accessing a property on a nullish value.
+
+```javascript
+const user = {
+    profile: {
+        name: "Dev"
+    }
+};
+
+console.log(user.profile?.name); // "Dev"
+console.log(user.address?.city); // undefined
+```
+
+Without optional chaining, accessing `user.address.city` would throw a `TypeError` because `user.address` is `undefined`.
+
+The key difference is that `&&` checks whether the left-hand value is truthy, whereas `?.` checks specifically for `null` or `undefined`.
+
+```javascript
+console.log(0 && 0.toString()); // Not a valid example
+```
+
+A clearer comparison is:
+
+```javascript
+const values = {
+    count: 0,
+    name: "",
+    active: false
+};
+
+console.log(values.count && values.count.toString());
+// 0
+
+console.log(values.count?.toString());
+// "0"
+
+console.log(values.name && values.name.length);
+// ""
+
+console.log(values.name?.length);
+// 0
+
+console.log(values.active && values.active.value);
+// false
+
+console.log(values.active?.value);
+// undefined
+```
+
+**Interview point:** `&&` short-circuits on any falsy value, including `0`, `""`, and `false`. Optional chaining only short-circuits when its receiver is `null` or `undefined`.
+
+Optional chaining also works with method calls:
+
+```javascript
+user.onSave?.();
+```
+
+This skips the call if `onSave` is nullish. However, if `onSave` exists but is not a function, it still throws a `TypeError`.
+
+### 2. Nullish Coalescing (`??`) vs. Logical OR (`||`)
+
+Both operators provide a fallback value, but their conditions differ.
+
+- `||` returns the fallback when the left-hand value is falsy.
+- `??` returns the fallback only when the left-hand value is `null` or `undefined`.
+
+```javascript
+console.log(0 || 10);          // 10
+console.log(0 ?? 10);          // 0
+
+console.log("" || "Default");  // "Default"
+console.log("" ?? "Default");  // ""
+
+console.log(false || true);    // true
+console.log(false ?? true);    // false
+
+console.log(null ?? "Default");      // "Default"
+console.log(undefined ?? "Default"); // "Default"
+```
+
+A practical example is handling API or configuration values:
+
+```javascript
+const settings = {
+    pageSize: 0,
+    username: "",
+    enabled: false
+};
+
+const pageSize = settings.pageSize ?? 20;
+const username = settings.username ?? "Guest";
+const enabled = settings.enabled ?? true;
+
+console.log(pageSize); // 0
+console.log(username); // ""
+console.log(enabled);  // false
+```
+
+If I used `||` instead, these legitimate values would be replaced by the defaults.
+
+**My rule:** I use `??` when only missing values should trigger a fallback. I use `||` when every falsy value should be treated as absent.
+
+One syntax restriction is that `??` cannot be directly mixed with `&&` or `||` without parentheses:
+
+```javascript
+// SyntaxError
+// const result = value || fallback ?? defaultValue;
+
+// Valid
+const result = (value || fallback) ?? defaultValue;
+```
+
+### 3. Pitfalls of Default Parameters
+
+Default parameters provide a fallback when an argument is omitted or explicitly passed as `undefined`. They do not apply when the argument is `null`, `0`, `false`, or an empty string.
+
+```javascript
+function greet(name = "Guest") {
+    return `Hello, ${name}`;
+}
+
+console.log(greet());          // "Hello, Guest"
+console.log(greet(undefined)); // "Hello, Guest"
+console.log(greet(null));      // "Hello, null"
+console.log(greet(""));        // "Hello, "
+```
+
+A common mistake is assuming that default parameters handle all empty or missing values. They only handle omission and `undefined`.
+
+Default parameters are evaluated when the function is called, not when the function is defined.
+
+```javascript
+function createUser(user = {}) {
+    user.created = true;
+    return user;
+}
+
+console.log(createUser()); // { created: true }
+console.log(createUser()); // { created: true }
+```
+
+Each call gets a new object because the default expression is evaluated separately for each call.
+
+This differs from reusing a shared object outside the function:
+
+```javascript
+const defaultUser = {};
+
+function createUser(user = defaultUser) {
+    user.created = true;
+    return user;
+}
+```
+
+Here, calls that omit the argument reuse the same object, which can cause shared mutable state.
+
+Another edge case is that later parameters can use earlier parameters in their default expressions, but parameters do not behave like ordinary function-scoped variables during initialization.
+
+```javascript
+function calculate(a = 2, b = a * 3) {
+    return a + b;
+}
+
+console.log(calculate()); // 8
+```
+
+Default parameter initializers also have their own scope. They cannot access variables declared in the function body before that body executes.
+
+### 4. Destructuring with Defaults
+
+Destructuring extracts values from arrays or objects into variables. Defaults apply when the extracted value is `undefined`, not when it is `null` or another falsy value.
+
+```javascript
+const {
+    name = "Guest",
+    age = 18,
+    active = true
+} = {
+    name: "",
+    age: 0,
+    active: false
+};
+
+console.log(name);   // ""
+console.log(age);    // 0
+console.log(active); // false
+```
+
+All three original values are preserved because none is `undefined`.
+
+However, a default does not protect against destructuring `null` or `undefined` themselves:
+
+```javascript
+const { name = "Guest" } = undefined;
+// TypeError
+```
+
+If an API response might be missing entirely, I would first provide an object fallback:
+
+```javascript
+const response = undefined;
+
+const {
+    name = "Guest"
+} = response ?? {};
+
+console.log(name); // "Guest"
+```
+
+Nested destructuring requires additional care:
+
+```javascript
+const {
+    profile: {
+        city = "Delhi"
+    } = {}
+} = {};
+
+console.log(city); // "Delhi"
+```
+
+The inner `= {}` handles a missing or `undefined` `profile`. Without it, destructuring `profile.city` would throw because `profile` is undefined.
+
+### 5. Rest and Spread Operators on Objects
+
+The same `...` syntax represents different operations depending on its position.
+
+**Spread** copies enumerable own properties into a new object:
+
+```javascript
+const original = {
+    name: "Dev",
+    address: {
+        city: "Delhi"
+    }
+};
+
+const copy = { ...original };
+
+copy.name = "Anand";
+
+console.log(original.name); // "Dev"
+console.log(copy.name);     // "Anand"
+
+copy.address.city = "Mumbai";
+
+console.log(original.address.city); // "Mumbai"
+```
+
+The important pitfall is that object spread creates a **shallow copy**, not a deep copy. Nested objects are still shared references.
+
+Object spread also copies enumerable own properties, not inherited properties or non-enumerable properties.
+
+**Rest** collects the remaining properties into a new object:
+
+```javascript
+const user = {
+    id: 1,
+    name: "Dev",
+    password: "secret"
+};
+
+const { password, ...publicUser } = user;
+
+console.log(publicUser);
+// { id: 1, name: "Dev" }
+```
+
+This is useful when removing or separating properties, but it is not a security boundary by itself. If sensitive fields are nested, or additional sensitive fields are introduced later, they may still be included in the resulting object.
+
+Property order also matters when using spread:
+
+```javascript
+const defaults = {
+    theme: "light",
+    pageSize: 20
+};
+
+const userSettings = {
+    theme: "blue"
+};
+
+console.log({
+    ...defaults,
+    ...userSettings
+});
+// { theme: "blue", pageSize: 20 }
+```
+
+Later properties overwrite earlier properties with the same key. Reversing the spread order would make `"light"` win.
+
+Object spread can also accept primitive values. For example, spreading a string creates enumerable character-index properties:
+
+```javascript
+console.log({ ..."cat" });
+// { 0: "c", 1: "a", 2: "t" }
+```
+
+Finally, spreading an object does not preserve its prototype or property descriptors. It creates ordinary data properties on the new object, so getters on the source may be evaluated while copying their values.
+
+### 6. Tagged Template Literals
+
+A tagged template literal passes a template's string segments and interpolated values to a function. Unlike an ordinary template literal, the tag function controls how the values are processed.
+
+```javascript
+function highlight(strings, ...values) {
+    return strings.reduce((result, string, index) => {
+        return result + string +
+            (index < values.length
+                ? `[${values[index]}]`
+                : "");
+    }, "");
+}
+
+const name = "Dev";
+const role = "Developer";
+
+console.log(highlight`Name: ${name}, Role: ${role}`);
+// Name: [Dev], Role: [Developer]
+```
+
+The tag receives an array of literal string segments followed by the interpolated values as separate arguments.
+
+For this example:
+
+- `strings` contains the static text around the expressions.
+- `values` contains `"Dev"` and `"Developer"`.
+- The function decides how to combine the strings and values.
+
+Tagged templates are useful for SQL query builders, internationalization, formatting, and styling libraries.
+
+One important pitfall is assuming tagged templates automatically escape unsafe input. They do not.
+
+```javascript
+const userInput = "<script>alert(1)</script>";
+
+// An ordinary template literal does not escape HTML.
+const html = `<div>${userInput}</div>`;
+```
+
+If that string is inserted into an HTML document using an unsafe sink such as `innerHTML`, it can create a cross-site scripting vulnerability. A secure tag must implement context-appropriate escaping or use a well-designed library. The tag's name alone does not make it safe.
+
+Another detail is that tagged templates can receive invalid escape sequences in cases where ordinary untagged template literals would fail, with the corresponding cooked string entry set to `undefined`. The `strings.raw` property exposes the raw template segments, including escape characters as written in the source.
+
+### Interview Conclusion
+
+I choose optional chaining when I want to guard against nullish values, and nullish coalescing when I want to provide defaults without replacing valid falsy values such as `0`, `false`, or `""`. With default parameters and destructuring, I remember that defaults apply to `undefined`, not every missing-looking value.
+
+For rest and spread, I account for shallow copying, property precedence, and enumerable own properties. For tagged templates, I understand how tags receive literal segments and interpolated values, and I never assume that template processing automatically makes untrusted data safe.
+
+*Q28. Numbers, dates and precision. Why does 0.1 + 0.2 !== 0.3, and how do you handle currency safely (integer paise/cents, BigInt, Intl.NumberFormat)? What are the gotchas of Date (time zones, month indexing, parsing ISO strings), and what does Number.MAX_SAFE_INTEGER imply for IDs from APIs?*
+
+In JavaScript, numbers, dates, and precision require special attention because the language uses IEEE 754 floating-point numbers for its standard `Number` type, handles dates with specific parsing and time-zone rules, and cannot safely represent every possible integer.
+
+As a developer, I focus on avoiding floating-point errors in financial calculations, handling dates consistently across time zones, and preserving the accuracy of identifiers received from APIs.
+
+### 1. Why does `0.1 + 0.2 !== 0.3`?
+
+JavaScript's `Number` type uses the IEEE 754 double-precision floating-point format. Many decimal fractions, including `0.1` and `0.2`, cannot be represented exactly in binary.
+
+```javascript
+console.log(0.1 + 0.2);
+// 0.30000000000000004
+
+console.log(0.1 + 0.2 === 0.3);
+// false
+```
+
+The values are stored as the nearest representable binary floating-point numbers. When they are added, the small representation errors result in a value slightly different from the literal `0.3`.
+
+For approximate numerical calculations, I can use a tolerance instead of strict equality:
+
+```javascript
+const result = 0.1 + 0.2;
+const expected = 0.3;
+
+console.log(Math.abs(result - expected) < 1e-10);
+// true
+```
+
+For calculations involving values of very different magnitudes, a fixed tolerance may not be sufficient; a relative tolerance may be more appropriate.
+
+**Interview point:** I do not use strict floating-point equality for general approximate calculations. For financial calculations, however, I prefer integer minor units or a suitable decimal arithmetic library rather than relying on floating-point tolerances.
+
+### 2. How do you handle currency safely?
+
+For financial applications, such as payment processing, restaurant billing, tax calculations, or invoice generation, precision is important. I generally use integer minor units, such as paise or cents, whenever the currency and calculation rules permit it.
+
+**Approach 1: Store amounts as integer paise or cents**
+
+For example, ₹125.50 is represented as 12,550 paise.
+
+```javascript
+const priceInPaise = 12550;
+const quantity = 3;
+
+const totalInPaise = priceInPaise * quantity;
+
+console.log(totalInPaise);        // 37650
+console.log(totalInPaise / 100);  // 376.5
+```
+
+This avoids floating-point errors during ordinary addition and multiplication of integer minor units, provided the results remain within the safe integer range.
+
+However, division, percentage calculations, tax rules, and currencies with different minor-unit conventions still require deliberate rounding rules.
+
+For example, I would not blindly calculate tax using floating-point arithmetic and assume the result is exact:
+
+```javascript
+const amountInPaise = 10000;
+const taxRatePercent = 18;
+
+// 18% tax on ₹100.00
+const taxInPaise = Math.round(
+    amountInPaise * taxRatePercent / 100
+);
+
+console.log(taxInPaise); // 1800
+```
+
+Here, the calculation uses integer paise and an explicit rounding step. In a real billing system, the rounding policy must match the applicable tax and accounting rules.
+
+**Approach 2: Use `BigInt` for very large integer amounts**
+
+When integer amounts can exceed `Number.MAX_SAFE_INTEGER`, `BigInt` can represent much larger integers exactly.
+
+```javascript
+const amountInPaise = 9007199254740993n;
+const taxNumerator = 18n;
+
+const taxInPaise =
+    amountInPaise * taxNumerator / 100n;
+
+console.log(taxInPaise);
+```
+
+`BigInt` arithmetic is exact for integer operations, but division truncates toward zero. If a calculation requires rounding to the nearest minor unit, I must implement the appropriate rounding policy explicitly.
+
+Also, `BigInt` cannot be mixed directly with `Number` arithmetic:
+
+```javascript
+// TypeError
+// console.log(100n + 50);
+```
+
+I would use `BigInt` only when the range requirements justify it, because it adds conversion and serialization considerations. For example, `JSON.stringify()` throws when it encounters a `BigInt` unless a suitable serialization strategy is provided.
+
+**Approach 3: Use `Intl.NumberFormat` for display**
+
+`Intl.NumberFormat` formats a numeric value according to a locale and currency. It is a presentation tool, not an exact financial arithmetic library.
+
+```javascript
+const formatter = new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR"
+});
+
+console.log(formatter.format(12550 / 100));
+// ₹125.50 (typical en-IN output)
+```
+
+For Indian currency, `en-IN` can provide localized currency formatting, including the appropriate grouping conventions.
+
+My practical approach is to store amounts in integer minor units, perform calculations using defined rounding rules, and use `Intl.NumberFormat` only for displaying the final amount. If calculations require arbitrary decimal precision, I would use a decimal arithmetic library rather than treating `Number` as an exact decimal type.
+
+### 3. What are the common pitfalls of JavaScript `Date`?
+
+JavaScript's `Date` represents an instant as milliseconds relative to the Unix epoch, with methods that interpret or format that instant using either UTC or the local time zone.
+
+There are three important pitfalls: time zones, zero-based months, and inconsistent assumptions when parsing date strings.
+
+**A. Time zones**
+
+```javascript
+const date = new Date("2026-10-14T10:00:00Z");
+
+console.log(date.toISOString());
+// "2026-10-14T10:00:00.000Z"
+
+console.log(date.getHours());
+// Depends on the environment's local time zone
+```
+
+The `Z` means UTC. The same instant can display as different local clock times in different time zones.
+
+In India, for example, UTC is five hours and thirty minutes behind Indian Standard Time. An instant at `10:00 UTC` corresponds to `15:30 IST`.
+
+I use UTC timestamps for exchanging instants between systems and explicitly handle the intended time zone when displaying dates or scheduling local events.
+
+A subtle distinction is that a calendar date, such as a birthday or invoice date, is not necessarily an instant in time. For date-only business values, I avoid accidentally converting them through time zones when the domain requires preserving the calendar date itself.
+
+**B. Months are zero-indexed**
+
+The month argument in the multi-argument `Date` constructor ranges from `0` to `11`, where `0` means January and `11` means December.
+
+```javascript
+const date = new Date(2026, 9, 14);
+
+console.log(date.getMonth()); // 9
+```
+
+This represents October 14, 2026, in the local time zone.
+
+This can cause off-by-one errors when month values come from an API or user interface that uses months numbered from `1` to `12`.
+
+Also, the constructor normalizes out-of-range components rather than always rejecting them, which can conceal invalid input.
+
+**C. Parsing ISO date strings**
+
+An ISO timestamp with an explicit time-zone offset identifies an unambiguous instant:
+
+```javascript
+const date = new Date("2026-10-14T10:00:00+05:30");
+
+console.log(date.toISOString());
+// "2026-10-14T04:30:00.000Z"
+```
+
+The input represents 10:00 in UTC+05:30, which is 04:30 UTC.
+
+A particularly important distinction is:
+
+```javascript
+new Date("2026-10-14");
+```
+
+A date-only ISO string is interpreted as UTC, whereas a date-time string without an offset, such as `"2026-10-14T10:00:00"`, is interpreted as local time.
+
+That difference can cause dates to shift when displayed in another time zone.
+
+I therefore prefer explicit ISO timestamps with `Z` or an offset when exchanging instants between a frontend and backend. For local schedules, I make the intended time zone explicit instead of relying on the browser's default.
+
+### 4. What does `Number.MAX_SAFE_INTEGER` mean for API IDs?
+
+`Number.MAX_SAFE_INTEGER` is `9007199254740991`, or \(2^{53}-1\).
+
+JavaScript can represent larger numeric values, but not every integer above this limit can be represented exactly. That means two distinct integer IDs from an API can become indistinguishable if they are parsed as JavaScript numbers.
+
+```javascript
+console.log(Number.MAX_SAFE_INTEGER);
+// 9007199254740991
+
+console.log(9007199254740992 === 9007199254740993);
+// true
+```
+
+The comparison is `true` because the second literal is rounded to a representable floating-point value, so the distinct integer values are no longer preserved as intended.
+
+This matters when working with database IDs, large transaction IDs, account identifiers, or values returned by APIs.
+
+**My approach:** If an API identifier can exceed the safe integer range, I ask for it to be returned as a string rather than a JSON number.
+
+```javascript
+const response = {
+    id: "9007199254740993"
+};
+
+console.log(response.id);
+// "9007199254740993"
+```
+
+I preserve the string for comparisons, storage, and API requests rather than converting it to `Number`. If arithmetic on the identifier is genuinely required, I can explicitly convert the string to `BigInt`, provided the API contract supports that workflow.
+
+For ordinary identifiers, strings are often the better choice anyway because IDs are labels, not quantities. They may also contain leading zeros or other formatting that numeric conversion would destroy.
+
+### Interview Conclusion
+
+JavaScript's `Number` uses binary floating-point, so decimal fractions are not always exact. For currency, I use integer minor units or decimal arithmetic with explicit rounding rules, and `Intl.NumberFormat` for display.
+
+With `Date`, I pay attention to UTC versus local time, zero-based months, and the difference between date-only strings and timestamps with explicit offsets. Finally, I preserve large API identifiers as strings whenever they may exceed `Number.MAX_SAFE_INTEGER`, because losing identifier precision can cause serious correctness issues.
+
+*Q29. Browser rendering and performance. What triggers reflow and repaint, and how does layout thrashing happen when reading and writing the DOM in a loop? How do requestAnimationFrame, requestIdleCallback, IntersectionObserver and passive event listeners help?*
+
+When a browser renders a webpage, it converts HTML and CSS into pixels on the screen. Understanding this process is important because unnecessary DOM updates, layout calculations, and JavaScript execution can cause performance problems, especially on pages with large lists, animations, or frequent user interactions.
+
+### 1. What are reflow and repaint?
+
+The browser rendering process generally involves these stages:
+
+1. **DOM and CSSOM:** The browser parses HTML into the DOM and CSS into the CSS Object Model.
+2. **Style calculation:** It determines which CSS rules apply to each element.
+3. **Layout (reflow):** It calculates the size and position of elements.
+4. **Paint (repaint):** It draws visual properties such as backgrounds, borders, shadows, and text.
+5. **Compositing:** It combines rendered layers to produce the final frame.
+
+**Reflow, or layout:** Happens when the browser must recalculate element dimensions or positions because something affecting layout has changed.
+
+Examples include:
+- Changing an element's width or height.
+- Adding or removing DOM elements.
+- Changing font size or content in ways that affect layout.
+- Resizing the browser window.
+- Reading certain layout properties after DOM changes have invalidated layout information.
+
+**Repaint:** Happens when the browser needs to redraw the visual appearance of elements without necessarily recalculating their layout.
+
+For example, changing an element's background color typically requires repainting but not reflowing its layout.
+
+```javascript
+const box = document.querySelector(".box");
+
+// Usually requires layout and paint.
+box.style.width = "300px";
+
+// Usually requires paint, but not layout.
+box.style.backgroundColor = "red";
+```
+
+These are typical cases, not absolute guarantees; the browser's rendering pipeline and CSS effects determine the actual work required.
+
+A useful optimization is to animate `transform` and `opacity` where appropriate, because they can often be handled by compositing without repeated layout or paint. However, compositor-layer promotion is not guaranteed, and excessive layers can also consume memory.
+
+### 2. What is layout thrashing?
+
+Layout thrashing occurs when JavaScript repeatedly alternates between DOM writes and layout-dependent reads, forcing the browser to synchronously recalculate layout multiple times.
+
+Consider this example:
+
+```javascript
+const items = document.querySelectorAll(".item");
+
+items.forEach((item) => {
+    item.style.width = "200px";
+
+    const height = item.offsetHeight;
+
+    console.log(height);
+});
+```
+
+Here, I change an element's width and immediately read `offsetHeight`. If the style change invalidates layout, the browser may have to recalculate layout before returning the height. Repeating this pattern across many elements can trigger repeated synchronous layout calculations.
+
+A better approach is to **batch DOM reads first and DOM writes afterward**.
+
+```javascript
+const items = document.querySelectorAll(".item");
+
+// Phase 1: Read layout information.
+const heights = Array.from(items, (item) => item.offsetHeight);
+
+// Phase 2: Write style changes.
+items.forEach((item, index) => {
+    item.style.height = `${heights[index] + 10}px`;
+});
+```
+
+This reduces the risk of alternating between invalidating layout and forcing layout reads. The browser can often combine the changes into fewer rendering updates.
+
+The general principle is:
+
+- Read layout properties together.
+- Calculate values in JavaScript.
+- Apply DOM mutations together.
+- Avoid layout-dependent reads immediately after writes when possible.
+
+Not every DOM write forces immediate reflow. The performance problem arises when a read requires the browser to resolve pending style or layout changes synchronously.
+
+### 3. How does `requestAnimationFrame()` help?
+
+`requestAnimationFrame()` schedules a callback before the browser's next repaint. It is useful for animations and visual updates that should align with the display's rendering cycle.
+
+```javascript
+const box = document.querySelector(".box");
+
+let position = 0;
+
+function animate() {
+    position += 2;
+
+    box.style.transform = `translateX(${position}px)`;
+
+    if (position < 300) {
+        requestAnimationFrame(animate);
+    }
+}
+
+requestAnimationFrame(animate);
+```
+
+The browser schedules the next animation callback when it is preparing to render another frame, allowing the animation to stay synchronized with rendering.
+
+**Why is this better than `setInterval()` for animations?**
+
+- It synchronizes visual updates with the browser's rendering cycle.
+- It avoids unnecessary updates between frames when the browser cannot display them.
+- Browsers generally pause or throttle animation callbacks in background tabs.
+- It makes frame-by-frame animations easier to coordinate.
+
+For best results, I avoid expensive calculations and repeated forced layouts inside the callback. `requestAnimationFrame()` does not automatically make inefficient DOM operations fast; it provides a better scheduling point for visual work.
+
+### 4. How does `requestIdleCallback()` help?
+
+`requestIdleCallback()` schedules low-priority work when the browser has an idle period available. It is useful for non-urgent tasks that do not need to happen immediately.
+
+```javascript
+function processBackgroundTasks(deadline) {
+    while (
+        deadline.timeRemaining() > 0 &&
+        pendingTasks.length > 0
+    ) {
+        const task = pendingTasks.shift();
+        task();
+    }
+
+    if (pendingTasks.length > 0) {
+        requestIdleCallback(processBackgroundTasks);
+    }
+}
+
+const pendingTasks = [
+    () => console.log("Task 1"),
+    () => console.log("Task 2"),
+    () => console.log("Task 3")
+];
+
+requestIdleCallback(processBackgroundTasks);
+```
+
+In this example, the tasks are processed incrementally instead of all being executed in one long synchronous operation.
+
+I would use this for non-critical background processing, deferred analytics, or optional work that can wait.
+
+However, there are important limitations:
+
+- Browser support is not universal, so a fallback may be needed.
+- Idle callbacks may be delayed, especially when the browser remains busy.
+- A timeout can be supplied when work should not be postponed indefinitely.
+- It should not be used for user-visible updates that must happen immediately.
+
+For a large computation, I would also consider breaking work into chunks or using a Web Worker if the task can run away from the main thread.
+
+### 5. How does `IntersectionObserver` improve performance?
+
+`IntersectionObserver` asynchronously observes whether an element intersects a viewport or another specified container. It is useful for lazy loading, infinite scrolling, and triggering work only when elements approach visibility.
+
+For example, I can load an image only when it approaches the viewport:
+
+```javascript
+const observer = new IntersectionObserver(
+    (entries, observer) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                const image = entry.target;
+
+                image.src = image.dataset.src;
+
+                observer.unobserve(image);
+            }
+        });
+    },
+    {
+        rootMargin: "200px"
+    }
+);
+
+document.querySelectorAll("img[data-src]").forEach((image) => {
+    observer.observe(image);
+});
+```
+
+The `rootMargin` setting makes the observer trigger before the image actually enters the visible viewport, giving the browser time to load it.
+
+Compared with repeatedly calling `getBoundingClientRect()` inside a scroll handler, `IntersectionObserver` avoids requiring application code to perform those visibility checks on every scroll event.
+
+I would use it for:
+- Lazy-loading images and other media.
+- Loading more data near the bottom of a list.
+- Starting animations when content becomes visible.
+- Deferring expensive work until it is relevant to the user.
+
+It does not eliminate all rendering costs, and its callbacks are asynchronous, so I would not use it when exact synchronous geometry is required.
+
+### 6. What are passive event listeners?
+
+A passive event listener tells the browser that the handler will not call `preventDefault()` to cancel the event's default action.
+
+This is particularly useful for touch and wheel events, where the browser may otherwise need to consider whether JavaScript will cancel scrolling before proceeding.
+
+```javascript
+window.addEventListener(
+    "touchmove",
+    (event) => {
+        console.log("Touch movement detected");
+    },
+    { passive: true }
+);
+```
+
+Because the listener is passive, the browser knows that the handler will not cancel the default scrolling behavior, which can improve scroll responsiveness.
+
+However, calling `event.preventDefault()` from a passive listener has no effect and typically produces a console warning.
+
+```javascript
+window.addEventListener(
+    "touchmove",
+    (event) => {
+        event.preventDefault(); // Ineffective in a passive listener.
+    },
+    { passive: true }
+);
+```
+
+If an interaction genuinely needs to prevent scrolling, I would not mark that listener as passive. I would instead carefully manage event cancellation and consider CSS properties such as `touch-action` where appropriate.
+
+Passive listeners do not automatically make the callback itself faster; their primary benefit is allowing the browser to proceed with the default action without waiting for the handler to decide whether to cancel it.
+
+### 7. How would I investigate rendering performance in Chrome DevTools?
+
+I would use the **Performance** panel to record the interaction that feels slow and inspect the main-thread activity.
+
+My process would be:
+
+1. Record the page while reproducing the slow interaction.
+2. Inspect the Main thread for long JavaScript tasks and repeated style recalculation or layout work.
+3. Look for repeated Layout events that occur between DOM mutations and geometry reads.
+4. Check whether paint or compositing work dominates the frame.
+5. Optimize the relevant code by batching DOM reads and writes, reducing unnecessary updates, or deferring non-critical work.
+6. Record the same interaction again to verify that rendering time and responsiveness improve.
+
+I would also use the Rendering tools, including paint flashing and layout-shift visualization where available, to identify unnecessary repaints and visible layout instability.
+
+For animations, I would aim to keep work within the available frame budget. At 60 Hz, a frame takes approximately 16.7 milliseconds, and JavaScript, style calculation, layout, paint, and compositing must all fit within the time available to maintain smooth rendering.
+
+### Interview Conclusion
+
+Reflow recalculates layout, while repaint redraws visual changes. Layout thrashing occurs when DOM writes and layout-dependent reads repeatedly force synchronous layout calculations, so I avoid it by batching reads and writes.
+
+I use `requestAnimationFrame()` for visual updates, `requestIdleCallback()` for non-urgent background work, `IntersectionObserver` for visibility-based behavior, and passive event listeners to improve scrolling responsiveness when default scrolling must not be canceled. Finally, I validate optimizations using Chrome DevTools rather than assuming a change is faster without measuring it.
+
+*Q30. Web security basics for a JS developer. Explain XSS (stored, reflected, DOM-based) and how escaping, CSP and textContent vs innerHTML prevent it. How do CSRF, CORS (including preflight) and HttpOnly/SameSite cookies work, and where should you store an auth token in a browser app?*
+
+As a JavaScript developer, I focus on preventing common web vulnerabilities such as XSS and CSRF, understanding how CORS protects cross-origin communication, and securely managing authentication tokens. The important principle is that **security should be enforced at multiple layers: the frontend, the backend, and the browser's security mechanisms.**
+
+## 1. Cross-Site Scripting (XSS)
+
+XSS occurs when an attacker injects malicious JavaScript into a web page, causing it to execute in another user's browser under the trusted origin of that website. Depending on the application's permissions and available credentials, the script may read sensitive page data, modify the UI, or perform actions as the user.
+
+There are three main types of XSS.
+
+### A. Stored XSS
+
+In stored XSS, the attacker submits malicious content that the application stores in a database and later displays to other users.
+
+**Example:**
+
+```javascript
+// Attacker submits this as a comment:
+const comment = '<img src=x onerror="alert(document.cookie)">';
+
+// The application saves the comment in its database.
+// Later, an unsafe frontend renders it:
+commentsContainer.innerHTML = comment;
+```
+
+When another user opens the page, the browser parses the injected HTML, and the event handler can execute.
+
+**Prevention:**
+- Render user-generated text using `textContent`.
+- Apply context-appropriate output encoding when inserting data into HTML.
+- Sanitize HTML with a reputable sanitizer if the application intentionally supports rich text.
+- Validate input on the server, but do not rely on input validation alone to prevent XSS.
+
+### B. Reflected XSS
+
+In reflected XSS, malicious input comes from a request, such as a query parameter, and the server or frontend immediately includes it in the response without safe handling.
+
+For example, an application might read a search term from the URL:
+
+```javascript
+const params = new URLSearchParams(window.location.search);
+const search = params.get("search");
+
+document.querySelector("#result").innerHTML =
+  `You searched for: ${search}`;
+```
+
+An attacker could craft a URL whose `search` parameter contains HTML with executable event-handler code. If the application inserts that input unsafely, the code may execute when a victim opens the URL.
+
+**Prevention:** Treat URL parameters as untrusted input. Render them as text or apply the correct output encoding for the destination context. The fact that the input came from a URL does not make it safe.
+
+### C. DOM-Based XSS
+
+DOM-based XSS happens when client-side JavaScript takes untrusted data and passes it into an unsafe DOM operation. The vulnerability may exist entirely in frontend code without requiring the server to reflect the payload.
+
+```javascript
+const userInput = window.location.hash.slice(1);
+
+// Unsafe: parses the input as HTML.
+document.querySelector("#profile").innerHTML = userInput;
+```
+
+**Prevention:** Avoid unsafe DOM sinks such as `innerHTML` when handling untrusted data. Prefer `textContent`, safe DOM APIs, and sanitization when HTML is genuinely required. Review sources such as `location`, URL parameters, and messages alongside dangerous sinks such as `innerHTML` and `document.write`.
+
+### `textContent` vs `innerHTML`
+
+```javascript
+const input = '<img src=x onerror=alert(1)>';
+
+element.textContent = input; // Displays the string as text.
+element.innerHTML = input;   // Parses it as HTML; potentially unsafe.
+```
+
+`textContent` does not interpret the assigned string as HTML, so it is generally the safer choice for displaying user-controlled text. `innerHTML` parses markup and can create an XSS vulnerability when supplied with untrusted content.
+
+However, `innerHTML` is not inherently dangerous in every situation; the risk depends on the content being inserted. If rich HTML is required, sanitize it with a maintained HTML sanitizer such as DOMPurify, and use the sanitized result consistently.
+
+### What is output escaping?
+
+Escaping encodes special characters so that they are treated as data rather than executable syntax in a particular context.
+
+For example, in HTML text, `<` can be encoded as `&lt;`, and `>` as `&gt;`. This prevents those characters from being interpreted as HTML tag delimiters in that context.
+
+The key detail is that **escaping must match the output context**. HTML text, HTML attributes, JavaScript strings, CSS, and URLs have different parsing rules. HTML escaping alone is not a universal solution for every context.
+
+### What is Content Security Policy (CSP)?
+
+CSP is a browser-enforced security policy delivered through an HTTP response header. It restricts where scripts and other resources can load from and can block certain forms of inline script execution.
+
+Example:
+
+```http
+Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-randomValue'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'
+```
+
+Here:
+- `default-src 'self'` sets a default same-origin resource policy.
+- `script-src` restricts script execution to the allowed sources and scripts carrying the matching nonce.
+- `object-src 'none'` blocks plugins such as embedded objects.
+- `base-uri 'self'` restricts the URLs that can be used in a `<base>` element.
+- `frame-ancestors 'self'` limits which origins can embed the page in a frame.
+
+In production, the nonce should be unpredictable and generated per response. A nonce-based policy should generally avoid allowing arbitrary inline scripts through `'unsafe-inline'`.
+
+CSP is a **defense-in-depth mechanism**, not a replacement for safe DOM operations, output encoding, or sanitization.
+
+## 2. CSRF (Cross-Site Request Forgery)
+
+CSRF occurs when an attacker tricks a user's browser into sending an unwanted request to a website where the user is already authenticated.
+
+For example, suppose a user is logged into a banking application. The browser automatically attaches the application's session cookie to matching requests. If the application accepts a sensitive state-changing request without adequate CSRF protection, an attacker may induce the browser to submit that request from another site.
+
+CSRF is especially relevant to cookie-based authentication because browsers can attach cookies automatically.
+
+**Prevention techniques:**
+
+1. **CSRF tokens:** Generate a token associated with the user's session and require the client to include it in state-changing requests. Validate it on the server.
+2. **SameSite cookies:** Use `SameSite=Lax` or `SameSite=Strict` where appropriate to reduce cross-site cookie sending.
+3. **Origin and Referer validation:** Validate request origins for sensitive operations when applicable.
+4. **Avoid state changes through GET requests:** Use appropriate HTTP methods and server-side authorization checks.
+5. **Require re-authentication or additional verification** for particularly sensitive operations when appropriate.
+
+`SameSite` is useful protection, but it should not automatically be treated as a complete replacement for CSRF tokens in every application.
+
+## 3. CORS (Cross-Origin Resource Sharing)
+
+Browsers enforce the same-origin policy. An origin consists of the scheme, hostname, and port. Therefore, `https://app.example.com` and `https://api.example.com` are different origins even though they share a parent domain.
+
+CORS is a browser mechanism that allows a server to specify which origins may read its cross-origin responses. It is **not an authentication mechanism**, and it does not generally prevent non-browser clients from making requests.
+
+For example, the API might return:
+
+```http
+Access-Control-Allow-Origin: https://app.example.com
+```
+
+This tells the browser that JavaScript running at that origin may access the response, subject to the other applicable CORS rules.
+
+### What is a CORS preflight request?
+
+For certain cross-origin requests, the browser sends an `OPTIONS` request before sending the actual request. This is called a preflight request.
+
+Preflight is typically required for requests using non-safelisted methods, non-safelisted request headers, or certain content types. For example, a cross-origin JSON `POST` with an `Authorization` header will generally trigger preflight.
+
+The browser might send:
+
+```http
+OPTIONS /api/users HTTP/1.1
+Origin: https://app.example.com
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: authorization, content-type
+```
+
+The server can respond:
+
+```http
+Access-Control-Allow-Origin: https://app.example.com
+Access-Control-Allow-Methods: GET, POST, PUT, DELETE
+Access-Control-Allow-Headers: Authorization, Content-Type
+```
+
+If the response satisfies the browser's preflight requirements, the browser can send the actual request. Otherwise, it blocks the request from proceeding as required by the CORS protocol.
+
+Not every cross-origin request is preflighted. A simple cross-origin request may be sent, but the browser can still prevent JavaScript from reading the response if the CORS checks fail.
+
+### CORS with cookies
+
+For credentialed cross-origin requests, the client must opt in to sending credentials, and the server must explicitly allow the requesting origin and credentials.
+
+```javascript
+fetch("https://api.example.com/profile", {
+  method: "GET",
+  credentials: "include"
+});
+```
+
+The server needs appropriate response headers:
+
+```http
+Access-Control-Allow-Origin: https://app.example.com
+Access-Control-Allow-Credentials: true
+```
+
+The server cannot use `Access-Control-Allow-Origin: *` for a credentialed CORS response. Cookie `SameSite`, `Secure`, domain, and path rules also affect whether cookies are sent.
+
+## 4. `HttpOnly`, `Secure`, and `SameSite` Cookies
+
+These cookie attributes solve different problems.
+
+```http
+Set-Cookie: session=opaque-value; HttpOnly; Secure; SameSite=Lax; Path=/
+```
+
+- **`HttpOnly`:** Prevents JavaScript from reading the cookie through APIs such as `document.cookie`. The browser can still attach it to matching HTTP requests. This reduces direct cookie theft through XSS, but it does not stop injected JavaScript from performing authenticated actions.
+- **`Secure`:** Restricts the cookie to secure HTTPS connections, with localhost-related browser exceptions in development.
+- **`SameSite=Lax`:** Restricts cookie sending in many cross-site contexts while allowing certain top-level navigations. `Strict` is more restrictive, while `None` permits cross-site cookie use and requires `Secure` in modern browsers.
+- **`Path` and `Domain`:** Control the requests for which a cookie is eligible. Avoid unnecessarily broad scope, and do not assume that setting a cookie's `Path` provides strong security isolation.
+
+For session-based authentication, a server-managed session identifier in an `HttpOnly`, `Secure`, appropriately scoped cookie is often a strong default.
+
+## 5. Where Should an Authentication Token Be Stored?
+
+There is no universal answer for every architecture. The right choice depends on the application's threat model, whether authentication uses cookies or bearer tokens, and whether the frontend and API share an origin.
+
+### Option A: `localStorage`
+
+```javascript
+localStorage.setItem("accessToken", token);
+const token = localStorage.getItem("accessToken");
+```
+
+**Advantages:** Simple to use and persists across browser sessions.
+
+**Disadvantages:** Any JavaScript executing in the origin can read it. A successful XSS attack may steal the token and reuse it outside the browser.
+
+I generally avoid storing long-lived or high-privilege authentication tokens in `localStorage` when a safer architecture is practical.
+
+### Option B: `sessionStorage`
+
+```javascript
+sessionStorage.setItem("accessToken", token);
+```
+
+It is scoped to the browser tab's session and usually disappears when that tab's session ends. However, it is still accessible to JavaScript, so it does not protect against XSS-based token theft.
+
+### Option C: In-memory storage
+
+Keep the access token in application memory, such as a JavaScript variable or state managed by the application.
+
+**Advantages:** It is not automatically persisted across page reloads and avoids the persistent exposure of browser storage.
+
+**Disadvantages:** A reload clears it unless the application has a refresh mechanism. XSS can still access or use a token while it is available to the running application.
+
+### Option D: `HttpOnly` Cookie
+
+For many traditional web applications, a secure, server-managed session cookie is a good default. For applications using short-lived access tokens and refresh tokens, a common design is to keep access tokens in memory and protect refresh credentials in appropriately configured `HttpOnly` cookies.
+
+A frontend cannot read an `HttpOnly` cookie directly; the browser handles it automatically. Because the browser may attach cookies to requests, the backend must also account for CSRF.
+
+### My practical recommendation
+
+For a first-party web application, I would consider these patterns:
+
+- **Traditional web application:** Server-side session with an `HttpOnly`, `Secure`, appropriately configured `SameSite` cookie.
+- **SPA with a backend-for-frontend (BFF):** Keep OAuth tokens on the server and give the browser a secure session cookie. This avoids exposing OAuth tokens directly to frontend JavaScript.
+- **SPA calling an API directly:** Use short-lived access tokens in memory when practical, and design refresh-token handling carefully. If refresh credentials use cookies, implement appropriate CSRF defenses and cookie settings.
+
+Avoid treating any one storage location as a complete security solution. XSS can still perform actions through the user's active session, and cookie-based authentication introduces CSRF considerations.
+
+## 6. How These Defenses Work Together
+
+| Threat | Main defenses |
+|---|---|
+| Stored, reflected, and DOM-based XSS | Safe DOM APIs, context-aware output encoding, sanitization when HTML is needed, CSP |
+| CSRF | CSRF tokens, `SameSite` cookies, Origin/Referer validation, correct HTTP method semantics |
+| Unauthorized cross-origin response access | Correct CORS origin, methods, headers, and credential configuration |
+| Direct JavaScript access to session cookies | `HttpOnly`, plus XSS prevention and least-privilege session design |
+| Token theft through persistent browser storage | Minimize token exposure, short token lifetime, in-memory access tokens, or a BFF |
+
+## Interview Conclusion
+
+My approach is to treat all externally controlled input as untrusted, use `textContent` instead of `innerHTML` for plain text, sanitize HTML when rich content is required, and deploy CSP as an additional layer of protection. I distinguish CSRF from CORS: CSRF tricks a browser into sending an authenticated request, while CORS controls whether browser JavaScript can access a cross-origin response. Finally, I choose authentication storage based on the architecture and threat model rather than automatically putting tokens in `localStorage`. For many first-party applications, an `HttpOnly`, `Secure` session cookie or a backend-for-frontend architecture provides a better foundation.
