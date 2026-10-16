@@ -642,4 +642,518 @@ Types of algorithms for implementing Database Replication?
 
 Used in: PostgreSQL, MySql, SQL Server, MongoDB, Kafka, etc.
 
+*Q18. URL shortener (bit.ly). Estimate traffic and storage. How do you generate unique short codes (counter + base62, hash + collision handling, pre-generated key service)? How do you scale reads with caching and a CDN, handle expiry, custom aliases and analytics without slowing redirects, and choose between SQL and NoSQL?*
+
+I would design a URL shortener around one primary requirement: **redirects must be extremely fast and reliable, while URL creation, expiry, and analytics can be handled asynchronously where appropriate.**
+
+The core system accepts a long URL, generates a short code, stores the mapping, and redirects requests to the original URL. At scale, the hardest parts are estimating capacity, generating unique codes safely, optimizing read-heavy traffic, and collecting analytics without adding latency to redirects.
+
+## 1. Requirements and assumptions
+
+### Functional requirements
+
+- Create a short URL from a valid long URL.
+- Redirect a short code to its destination.
+- Support custom aliases such as `/summer-sale`.
+- Support expiration dates and optional link deactivation.
+- Track clicks, referrers, timestamps, and coarse device or geographic information.
+- Optionally support user accounts, link management, and analytics dashboards.
+
+### Non-functional requirements
+
+- Low-latency redirects, ideally within tens of milliseconds at the application layer.
+- High availability for reads.
+- Unique codes with no accidental overwrites.
+- Abuse prevention against phishing, spam, and malicious destinations.
+- Eventual consistency for analytics is acceptable; incorrect redirects are not.
+
+For a concrete estimate, assume:
+
+| Parameter | Assumption |
+|---|---:|
+| New short URLs | 10 million/day |
+| Redirects | 100 million/day |
+| Peak-to-average traffic factor | 5× |
+| Average stored mapping size | 500 bytes |
+| Average analytics event size | 200 bytes |
+
+These are design assumptions, not measured Bitly statistics.
+
+## 2. Traffic and storage estimation
+
+### Write traffic
+
+\[
+\frac{10{,}000{,}000}{86{,}400}
+\approx 116 \text{ writes/second}
+\]
+
+At a 5× peak factor:
+
+\[
+116 \times 5 \approx 580 \text{ writes/second}
+\]
+
+### Read traffic
+
+\[
+\frac{100{,}000{,}000}{86{,}400}
+\approx 1{,}157 \text{ redirects/second}
+\]
+
+Peak redirects:
+
+\[
+1{,}157 \times 5 \approx 5{,}785 \text{ requests/second}
+\]
+
+That is manageable with a horizontally scaled application tier and a suitable database, but a real design must also account for traffic skew: a small number of viral URLs may receive a large fraction of requests.
+
+### Mapping storage
+
+At 10 million new mappings per day:
+
+\[
+10{,}000{,}000 \times 365
+= 3.65 \text{ billion mappings/year}
+\]
+
+At 500 bytes per mapping:
+
+\[
+3.65 \times 10^9 \times 500
+= 1.825 \text{ TB/year}
+\]
+
+That is approximately 1.83 TB/year in decimal units, **before indexes, replication, database overhead, backups, and storage-engine overhead**. A practical provisioned footprint could be several times larger.
+
+### Analytics storage
+
+At 100 million redirects per day and 200 bytes per event:
+
+\[
+100{,}000{,}000 \times 200
+= 20 \text{ GB/day}
+\]
+
+That is roughly 7.3 TB/year of raw analytics events, before indexes, replication, and compression.
+
+This is why I would not store every click as an additional row in the same transactional table that serves redirects. I would send events to a queue or streaming platform and process them separately.
+
+## 3. High-level architecture
+
+<text> </text>
+
+```text
+                    URL creation
+                        |
+                    API service
+                        |
+                Code generation
+                        |
+                  Mapping database
+                        |
+                    Short code
+
+Browser -- GET /abc123 --> CDN / edge cache
+                              |
+                         Redirect service
+                              |
+                       Local / Redis cache
+                              |
+                        Mapping database
+                              |
+                         301 / 302
+                              |
+                    Async click event
+                              |
+                     Queue / stream
+                              |
+                  Analytics consumers
+                              |
+                  Analytics data store
+```
+
+The redirect service should be stateless so it can scale horizontally. The mapping database is the source of truth, caches accelerate reads, and analytics runs outside the redirect's critical path.
+
+For a new link, I validate the destination, allocate a code, persist the mapping, and only then return the short URL. For a redirect, I resolve the code, check status and expiry, emit a redirect response, and enqueue analytics without waiting for the analytics pipeline to finish.
+
+## 4. Generating unique short codes
+
+A short code must be unique. It must also be reasonably compact, URL-safe, and difficult enough to enumerate if the links are intended to be private.
+
+There are three common approaches.
+
+### Approach A: counter or unique ID + Base62
+
+Allocate a unique numeric ID, then encode it using 62 characters:
+
+`0-9`, `a-z`, and `A-Z`.
+
+Example:
+
+```javascript
+const ALPHABET =
+  "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+function encodeBase62(number) {
+  if (!Number.isSafeInteger(number) || number < 0) {
+    throw new Error("Expected a non-negative safe integer");
+  }
+
+  if (number === 0) return "0";
+
+  let result = "";
+
+  while (number > 0) {
+    result = ALPHABET[number % 62] + result;
+    number = Math.floor(number / 62);
+  }
+
+  return result;
+}
+
+console.log(encodeBase62(125)); // "21"
+```
+
+Here, `125` becomes `21` in Base62.
+
+**How to allocate IDs:**
+- A database sequence or auto-incrementing primary key.
+- A distributed ID generator.
+- A dedicated ID allocation service.
+- Preallocated ranges of IDs assigned to different application instances.
+
+**Advantages**
+- Guaranteed uniqueness when ID allocation is correct.
+- No hash collisions.
+- Simple lookup and predictable code length for a given ID range.
+
+**Disadvantages**
+- Sequential IDs are guessable.
+- A single central allocator can become a bottleneck.
+- Distributed allocation requires careful coordination or range management.
+
+For a large system, I might allocate ID ranges to application instances so they can generate codes locally without contacting a central service for every URL. I would ensure that ranges are never assigned twice.
+
+Base62 encoding is not encryption. If codes need to be difficult to enumerate, use a random or cryptographically generated identifier, or apply an appropriate permutation to IDs while preserving uniqueness.
+
+### Approach B: hash the long URL
+
+Compute a hash of the normalized URL, then truncate or encode part of it.
+
+```javascript
+import { createHash } from "node:crypto";
+
+function hashUrl(url) {
+  return createHash("sha256")
+    .update(url)
+    .digest("base64url")
+    .slice(0, 8);
+}
+```
+
+This is illustrative, not a complete unique-code generator.
+
+**The problem:** truncating a hash can produce collisions. Two different long URLs may generate the same short code.
+
+Collision handling options:
+1. Insert the mapping using a unique constraint on the code.
+2. If the insert conflicts, generate another candidate or use more hash bits.
+3. Retry a bounded number of times.
+4. Return a controlled error if allocation still fails.
+
+A deterministic hash can be useful when deduplication is a requirement, but it is not necessarily desirable for a general URL shortener. Different users may want separate links to the same destination, with different expiry policies, access controls, or analytics.
+
+Also, normalize URLs carefully. Removing query parameters or changing path casing can change the meaning of a destination.
+
+### Approach C: pre-generated key service
+
+A dedicated service generates unique codes in advance and stores them in a pool. Application instances request batches of available codes and consume them locally.
+
+For example:
+
+```text
+Key service
+   |
+   +--> Instance A: codes 1000–1999
+   |
+   +--> Instance B: codes 2000–2999
+   |
+   +--> Instance C: codes 3000–3999
+```
+
+The ranges are illustrative; a real key service may allocate random codes rather than sequential ranges.
+
+**Advantages**
+- Low latency during URL creation.
+- Reduced contention on a central ID generator.
+- Can use random codes to make enumeration more difficult.
+
+**Challenges**
+- Safe allocation and lease management.
+- Wasted codes when instances crash.
+- Pool replenishment and exhaustion.
+- Avoiding reuse of codes that may still exist in caches or external references.
+
+Unused codes are generally harmless. Reusing a code that once pointed to a different destination can be dangerous because old links may still be shared or cached.
+
+### Which approach would I choose?
+
+For a conventional, high-volume URL shortener, I would start with a unique ID generator plus Base62, using a distributed allocator or preallocated ID ranges if necessary. I would add a randomization strategy if enumeration is a concern.
+
+For custom aliases, I would bypass automatic generation and enforce a unique database constraint on the alias.
+
+**The database uniqueness constraint is the final authority**, regardless of the code-generation algorithm.
+
+## 5. Read scaling: cache, Redis, and CDN
+
+Redirects vastly outnumber URL creations, so the read path is the most important part of the design.
+
+I would use a two-level cache:
+
+1. **CDN or edge cache:** serves frequently requested redirects close to users.
+2. **Redis or an in-process cache:** serves requests that reach the origin.
+3. **Database:** source of truth on cache misses.
+
+### Cache-aside example
+
+```javascript
+async function resolveShortCode(code) {
+  const cached = await redis.get(`url:${code}`);
+
+  if (cached !== null) {
+    const mapping = JSON.parse(cached);
+
+    if (mapping.expiresAt && Date.now() >= mapping.expiresAt) {
+      return null;
+    }
+
+    return mapping;
+  }
+
+  const mapping = await db.findByCode(code);
+
+  if (!mapping || !mapping.isActive) {
+    return null;
+  }
+
+  if (mapping.expiresAt && Date.now() >= mapping.expiresAt) {
+    return null;
+  }
+
+  const remainingTtl = mapping.expiresAt
+    ? Math.floor((mapping.expiresAt - Date.now()) / 1000)
+    : 3600;
+
+  if (remainingTtl > 0) {
+    await redis.set(
+      `url:${code}`,
+      JSON.stringify(mapping),
+      { EX: remainingTtl }
+    );
+  }
+
+  return mapping;
+}
+```
+
+This is illustrative; production code should validate the code, handle cache/database failures, and distinguish expired, missing, and inactive mappings as needed.
+
+### Cache design considerations
+
+- Cache hot codes based on actual access patterns rather than assuming a fixed hit rate.
+- Set cache TTLs so entries do not outlive their link expiry.
+- Use negative caching for missing codes with a short TTL to reduce repeated database lookups for random invalid codes.
+- Prevent cache stampedes when many requests miss the same key simultaneously.
+- Invalidate or update cache entries when a link is deactivated or its destination changes.
+- Use a bounded local cache only when its staleness and invalidation behavior are acceptable.
+
+A Redis hit rate of 90% would reduce origin database reads by approximately 90% for requests reaching that cache, assuming the workload and cache behavior support that rate. A CDN may reduce origin traffic further.
+
+### CDN caching and HTTP redirects
+
+For a URL shortener, I would normally choose **HTTP 302** initially.
+
+- `301 Moved Permanently` can be cached by browsers and intermediaries. That improves performance but can make destination changes, expiry enforcement, and click counting difficult.
+- `302 Found` is a temporary redirect and is commonly used when redirects need to remain under application control. Explicit caching headers still matter.
+
+A CDN can cache a 302 if its caching policy allows it, so the status code alone does not guarantee every click reaches the origin.
+
+If the product needs exact per-visit analytics, avoid caching the redirect beyond the point where the click is recorded. If analytics are approximate and link destinations are immutable, edge caching can be more aggressive.
+
+## 6. Expiration and deletion
+
+Each mapping should include an expiry timestamp, typically `expires_at`, or no expiry if the link is permanent.
+
+I use two mechanisms:
+
+- **Lazy expiry check:** check the timestamp whenever a redirect resolves.
+- **Background cleanup:** periodically deactivate or remove expired records and associated cache entries.
+
+The lazy check is the correctness mechanism; the cleanup job reclaims storage and maintains indexes.
+
+For example:
+
+```sql
+SELECT destination_url, expires_at, is_active
+FROM url_mappings
+WHERE short_code = ?;
+```
+
+After retrieving a record, the redirect service checks `is_active` and `expires_at` before returning a redirect.
+
+Important details:
+
+- A cache TTL should never extend beyond the link's expiry.
+- Expiry workers should be idempotent and safe to run concurrently.
+- If a link can be deactivated immediately, invalidate its Redis entry and purge relevant CDN caches.
+- CDN purge propagation may not be instantaneous, so short-lived edge TTLs or versioned cache keys may be needed for links that require strict revocation.
+- Do not reuse expired codes casually. A previously shared link could unexpectedly redirect to a different destination if its code is reassigned.
+
+For systems where revocation must take effect immediately, aggressive edge caching is a trade-off that needs explicit handling.
+
+## 7. Custom aliases
+
+A user may request a readable alias such as `/black-friday`.
+
+I would store generated codes and custom aliases in the same namespace, protected by a unique constraint.
+
+```sql
+CREATE TABLE url_mappings (
+    short_code VARCHAR(32) PRIMARY KEY,
+    destination_url TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    expires_at TIMESTAMP NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    user_id BIGINT NULL
+);
+```
+
+When creating a custom alias:
+
+1. Validate its allowed characters and length.
+2. Reject reserved paths such as `/admin`, `/api`, and health-check routes.
+3. Check authorization and rate limits.
+4. Attempt the insert.
+5. If the unique constraint fails, return `409 Conflict`.
+
+A preliminary availability check is useful for the user interface, but it is not sufficient to guarantee uniqueness: two concurrent requests can both pass the check. The database constraint resolves that race.
+
+I would also prevent users from creating aliases that impersonate reserved system routes or violate abuse policies.
+
+## 8. Analytics without slowing redirects
+
+The redirect path should not wait for a database insert into an analytics table, a dashboard aggregation, or a third-party analytics API.
+
+Instead:
+
+```text
+Redirect request
+      |
+Resolve mapping and validate expiry
+      |
+Return 302 response
+      |
+Publish click event asynchronously
+      |
+Kafka / durable queue
+      |
+Analytics consumers
+      |
+Aggregate store / data warehouse
+```
+
+A click event might contain:
+
+```json
+{
+  "eventId": "evt_123",
+  "shortCode": "aB12xy",
+  "timestamp": "2026-10-16T10:00:00Z",
+  "referrer": "https://example.com",
+  "userAgent": "browser information",
+  "country": "IN"
+}
+```
+
+This is an illustrative event schema. Avoid retaining raw IP addresses or detailed identifiers unless needed and permitted by the product's privacy policy.
+
+### Delivery and failure handling
+
+A critical distinction: placing an event on an in-memory queue does not guarantee delivery if the process crashes.
+
+For more reliable analytics, publish to a durable message broker or use a local durable mechanism. The redirect handler should not block on analytics aggregation, but the system must define what happens when the broker is unavailable.
+
+Possible policies include:
+
+- Best-effort analytics for noncritical click counts.
+- Bounded local buffering with explicit drop metrics.
+- Durable event publication with a suitable latency budget.
+- A transactional or durable outbox when events must correspond reliably to committed business operations.
+
+Consumers should be idempotent because message brokers commonly provide at-least-once delivery in many configurations. Deduplicate events or use aggregation logic that handles retries.
+
+### Why not increment a click counter directly?
+
+Doing this for every redirect:
+
+```sql
+UPDATE url_mappings
+SET click_count = click_count + 1
+WHERE short_code = ?;
+```
+
+creates a write on the hottest part of the read path. Popular links can cause row contention, increased database writes, and higher redirect latency.
+
+Instead, publish events and aggregate counts asynchronously. For dashboards, use time-windowed aggregates such as clicks per link per minute or hour.
+
+Also account for bots, link-preview crawlers, duplicate events, and retries. Raw HTTP requests do not always represent unique human clicks.
+
+## 9. SQL vs. NoSQL
+
+Neither is universally correct. The access pattern and operational constraints determine the choice.
+
+| Factor | SQL, e.g. PostgreSQL/MySQL | NoSQL, e.g. DynamoDB/Cassandra |
+|---|---|---|
+| Primary lookup | Excellent with indexed primary key | Excellent with partition/key lookup |
+| Uniqueness constraints | Straightforward | Depends on database and conditional-write support |
+| Transactions and relational queries | Strong support | Varies by database |
+| Horizontal scaling | Possible, but sharding adds complexity | Often a core design capability |
+| Flexible analytics queries | Good for relational metadata; huge event analytics still need separate storage | Depends on model; often paired with an analytics system |
+| Operational complexity | Often simpler at moderate scale | Can simplify high-scale key lookups but introduces its own partitioning and consistency concerns |
+
+### What I would choose
+
+For an initial product or a moderate-scale service, I would choose **PostgreSQL or MySQL** with:
+
+- `short_code` as the primary key.
+- Indexed ownership and expiry fields where needed.
+- A Redis cache for hot mappings.
+- A separate analytics pipeline.
+
+A relational database is more than capable of serving a large number of indexed point lookups when properly sized and scaled.
+
+If the system grows to billions of mappings and needs massive distributed read throughput, a managed key-value database such as DynamoDB or a carefully operated distributed store such as Cassandra becomes attractive. Partitioning by `short_code` aligns with the dominant lookup pattern.
+
+I would not choose NoSQL simply because the system is “large.” I would choose it when its scaling, availability, and operational characteristics justify the trade-offs.
+
+## 10. Production failure cases
+
+- **Redis unavailable:** fall back to the database with concurrency limits and circuit breaking so the database does not collapse under a sudden cache-miss storm.
+- **Database unavailable:** cached links may still work, but cache misses cannot be resolved. Avoid serving expired or revoked entries merely because the database is down.
+- **Hot key:** use edge caching, request coalescing, and appropriate cache replication or local caching.
+- **Random-code abuse:** rate-limit invalid lookups and consider short-lived negative caching.
+- **Analytics broker unavailable:** apply a defined bounded-buffer or drop policy and monitor lost events.
+- **Malicious destination:** validate URL schemes, scan against abuse intelligence where appropriate, and provide reporting and takedown mechanisms.
+- **Custom alias collision:** rely on a database uniqueness constraint, not an application-side check alone.
+- **Expiry race:** verify expiry on resolution and keep cache TTLs aligned with the expiration timestamp.
+
+## Interview-ready summary
+
+“I would assume a read-heavy workload, estimate average and peak traffic, and calculate mapping and analytics storage separately. For code generation, I would start with unique IDs encoded in Base62, using distributed ID allocation or preallocated ranges as scale demands; random hashes require collision handling. Redirects use a CDN and Redis in front of a database, with expiry checks and cache invalidation. I would use 302 redirects when I need continued control and reliable origin-side click measurement, and publish analytics asynchronously to a durable queue rather than incrementing a database counter on every request. I would start with SQL for its simplicity and constraints, then consider NoSQL if measured scale and availability requirements justify it.”
+
+For additional system-design perspectives, see this recent [URL shortener design walkthrough](https://bytepatterns.com/blog/design-a-url-shortener-system-design-interview). <Cite refs={["turn371459search1","turn371459search2","turn371459search5"]}/>
+
+*Q19. Rate limiter. Design a distributed rate limiter for an API gateway. Compare fixed window, sliding window log, sliding window counter and token bucket. Where does it live (gateway, middleware, sidecar), how do you keep counters consistent across nodes with Redis and Lua, and what happens when Redis is down (fail open vs fail closed)?*
 
