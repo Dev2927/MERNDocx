@@ -3,16 +3,16 @@
 System design is the process of planning, structuring and defining the architecture of Software System.
 
 - Involves translating user requirements into a detailed blueprint that guides the implementation phase.
+
 - The goal is to create a well-organized and efficient structure that meets the intended purpose while considering factors like scalability, maintainability, and performance.
 
 System Design in SDLC
 
 - In System Design Life Cycle, without the designing phase, one cannot jump to the implementation or the testing part.
+
 - System Design is a vital step and also provides the backbone to handle exceptional scenarios because it represents the business logic of the software.
 
 System Design can be divided into two complementary parts
-
-![alt text](image-8.png)
 
 Real World Examples of HLD Decisions
 
@@ -34,28 +34,24 @@ Steps for getting started with System Design
 
 - Plan for Scalability: Design with growth in mind—anticipate load, optimize bottlenecks, and use scalable patterns.
 
-
 *Q2. Horizontal vs. Vertical Scaling*
 
 In system design, scaling is crucial for managing increased loads. Horizontal scaling and vertical scaling are two different approaches to scaling a system, both of which can be used to improve the performance and capacity of the system.
 
-![alt text](image-9.png)
+# Why do we need Scaling!!
 
-Why do we need Scaling!!
-
-- Handle increased user load and traffic.
+- To Handle increased user load and traffic.
 - Ensure high availability and reliability.
 - Maintain performance and response time.
 - Support growing data and storage needs.
 
-Vertical Scaling
+# Vertical Scaling
 
 Vertical scaling, also known as scaling up, refers to the process of increasing the capacity or capabilities of an individual hardware or software component within a system.
 
 - We upgrade the same system rather than adding more systems. Add more power to your machine by adding better processors, increasing RAM, or other power-increasing adjustments.
-- Simple to implement and useful for monolithic and small scale applications.
 
-![alt text](image-10.png)
+- Simple to implement and useful for monolithic and small scale applications.
 
 Examples
 
@@ -74,14 +70,12 @@ Disadvantages
 - One server still receives all incoming requests thus increasing the possibility of downtime in the event of a server failure.
 - Scaling up often requires restarting or replacing the machine, causing downtime.
 
-Horizontal Scaling
+# Horizontal Scaling
 
 Horizontal scaling, also known as scaling out, refers to the process of increasing the capacity or performance of a system by adding more machines or servers to distribute the workload across a larger number of individual units.
 
 - There is no need to change the capacity of the server or replace the server.
 - There is no downtime while adding more servers to the network.
-
-![alt text](image-11.png)
 
 Examples
 

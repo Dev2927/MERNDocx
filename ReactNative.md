@@ -34,18 +34,18 @@ React Native apps run on multiple threads:
 
 Disadvantages of the Old Architecture
 
-🚨 1. Performance Issues
+1. Performance Issues
 Communication between JavaScript and Native is slow because messages are passed asynchronously through the Bridge.
 Scrolling may lag if UI updates arrive too late.
 
-🚨 2. No Shared Memory
+2. No Shared Memory
 JavaScript and Native don’t share memory.
 Instead of referencing a data object, React Native copies it in JSON format, which slows things down.
 
-🚨 3. Heavy Native Module Loading
+3. Heavy Native Module Loading
 React Native loads all native modules at startup, even if some aren’t needed, which increases load time.
 
-🚨 4. Harder to Contribute
+4. Harder to Contribute
 The React Native codebase is complex, making it difficult for developers to contribute fixes or improvements.
 
 The New Architecture: Fabric & TurboModules
@@ -56,11 +56,13 @@ What is Fabric?
 Fabric removes the Bridge and introduces a faster, more efficient communication model between JavaScript and Native.
 
 How is Fabric Better?
+
 Uses synchronous communication (not async messages like before).
 Allows JavaScript and Native to share memory, reducing the need to copy data.
 Improves UI responsiveness and smoothness.
 
 What are TurboModules?
+
 TurboModules allow React Native to load only the native modules that are needed, instead of loading everything at startup.
 
 How are TurboModules Better?
@@ -70,24 +72,29 @@ How are TurboModules Better?
 
 *Q2. What Happens When You Click on a React Native App Icon?*
 
-Step 1: App Launches & UI Manager Starts
+1. App Launches & UI Manager Starts
+
 When you tap the app icon, the operating system launches the app and starts React Native.
 The UI Manager initializes all native components like text fields, buttons, images, etc.
 
-Step 2: JavaScript Bundle Loads
+2. JavaScript Bundle Loads
+
 React Native loads MainBundle.js, which contains all JavaScript code for the app.
 If you check the terminal while the app is starting, you’ll see logs showing “Loading MainBundle.js”.
 
-Step 3: Views are Created via the Bridge (Old Architecture) or Fabric (New Architecture)
+3. Views are Created via the Bridge (Old Architecture) or Fabric (New Architecture)
+
 Old Architecture: JavaScript sends JSON messages to the Bridge to create UI elements.
 New Architecture: Fabric directly interacts with native code, making UI rendering faster.
 
-Step 4: Layout Calculation (Using Yoga Engine)
+4. Layout Calculation (Using Yoga Engine)
+
 React Native doesn’t use standard CSS like the web.
 Instead, it uses Yoga Engine to calculate layouts and positions of elements.
 The Shadow Thread handles this layout processing.
 
-Step 5: UI Appears on Screen
+5. UI Appears on Screen
+
 Finally, the UI Manager displays the UI based on the calculated layout.
 You see the app fully loaded and ready to use! 🎉
 

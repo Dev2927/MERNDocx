@@ -5,7 +5,9 @@ If CPU and DB are healthy but latency climbs under load, the time is going to wa
 # Step 1: Characterize the problem
 
 - Percentiles, not averages. Check p50/p95/p99 per endpoint. If only p99 is bad, suspect GC pauses or head-of-line blocking. If everything degrades, suspect saturation.
+
 - Latency vs. concurrency. If throughput plateaus while latency keeps rising, requests are queueing somewhere. By Little’s Law, concurrency = throughput × latency, so a flat throughput ceiling means a fixed-size resource is exhausted.
+
 - Scope. One endpoint or all? Since a deploy? Only on one instance?
 
 # Step 2: Check the event loop first
