@@ -173,11 +173,12 @@ Props can carry data, JSX (children), and callbacks. Callback props are how chil
 
 Keys give sibling elements stable identity so reconciliation can preserve or reset the correct component state and DOM.
 
-Introduction
+# Introduction
 
 The key prop is a special attribute you need to include when creating lists of elements in React. It is crucial for helping React identify which items have changed, been added, or removed, thereby optimizing the rendering process.
 
-Why key is important
+# Why key is important
+
 Stable identity affects correctness before it affects rendering efficiency:
 
 1. Correct identity during reconciliation: When React diffs a list, the key is how it decides which previous element corresponds to which new one. Without keys (or with bad keys) React can still render the list, but it will associate the wrong component instance with the wrong data — which means the wrong internal state, refs, and DOM nodes get reused. The bigger risk is incorrect state association, not raw DOM operation count.
@@ -210,7 +211,7 @@ function ListItem({ value }) {
   return <li>{value}</li>;
 }
 
-Rules for keys
+# Rules for keys
 
 A useful key must remain tied to the same logical sibling across renders:
 
@@ -317,7 +318,9 @@ Context is convenient for distribution, but its broadcast update model and impli
 When a context value changes by reference, every component that reads that context re-renders — even if it only uses a field that hasn't actually changed. The most common cause is constructing a new object inline as the provider's value, which makes a fresh reference on every parent render:
 
 // Pitfall — `value` is a new object every render, so every consumer re-renders
+
 function ParentComponent() {
+
   const [user, setUser] = useState(null);
   const [theme, setTheme] = useState('light');
 
@@ -331,6 +334,7 @@ function ParentComponent() {
 Fix it by memoizing the value. React Compiler may generate equivalent memoization when enabled, but Context still propagates every genuine value change:
 
 function ParentComponent() {
+  
   const [user, setUser] = useState(null);
   const [theme, setTheme] = useState('light');
 
@@ -354,7 +358,7 @@ A common surprise: wrapping a consumer in React.memo does not prevent re-renders
 
 # Putting too much unrelated state in one context
 
-If you cram an entire app's state into a single context, every change to any slice re-renders every consumer. Split it into smaller, focused providers — for example, separate AuthContext, ThemeContext, and CartContext — so that a cart update doesn't re-render every theme consumer. You can also split read and write APIs into separate contexts so components that only need to dispatch don't re-render when state changes.
+If you cram an entire app's state into a single context, every change to any slice re-renders every consumer. Split it into smaller, focused providers — for example, separate AuthContext, ThemeContext, and CartContext — so that a cart update doesn't re-render every theme consumer.You can also split read and write APIs into separate contexts so components that only need to dispatch don't re-render when state changes.
 
 *Q8. What are the benefits of using hooks in React?*
 
