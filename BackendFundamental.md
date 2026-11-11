@@ -250,7 +250,9 @@ A signed JWT is not normally revocable by itself because a server can validate i
 I would consider three approaches:
 
 1. **Short-lived access tokens:** Keep access tokens valid for a short period, such as 5–15 minutes, to limit the impact of a compromised token.
+
 2. **Token denylist:** Store revoked token identifiers, such as the JWT `jti` claim, in Redis or a database until the tokens expire. The API checks the denylist during authentication.
+
 3. **Token version or session version:** Maintain a token version or session status on the server. When the user logs out everywhere or an administrator disables the account, increment the version or invalidate the session. Requests must check the relevant server-side state.
 
 Short-lived tokens reduce the exposure window, while a denylist or server-side state check enables more immediate revocation.

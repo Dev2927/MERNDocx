@@ -5120,16 +5120,6 @@ For a first-party web application, I would consider these patterns:
 
 Avoid treating any one storage location as a complete security solution. XSS can still perform actions through the user's active session, and cookie-based authentication introduces CSRF considerations.
 
-## 6. How These Defenses Work Together
+Questions Completed!
 
-| Threat | Main defenses |
-|---|---|
-| Stored, reflected, and DOM-based XSS | Safe DOM APIs, context-aware output encoding, sanitization when HTML is needed, CSP |
-| CSRF | CSRF tokens, `SameSite` cookies, Origin/Referer validation, correct HTTP method semantics |
-| Unauthorized cross-origin response access | Correct CORS origin, methods, headers, and credential configuration |
-| Direct JavaScript access to session cookies | `HttpOnly`, plus XSS prevention and least-privilege session design |
-| Token theft through persistent browser storage | Minimize token exposure, short token lifetime, in-memory access tokens, or a BFF |
-
-## Interview Conclusion
-
-My approach is to treat all externally controlled input as untrusted, use `textContent` instead of `innerHTML` for plain text, sanitize HTML when rich content is required, and deploy CSP as an additional layer of protection. I distinguish CSRF from CORS: CSRF tricks a browser into sending an authenticated request, while CORS controls whether browser JavaScript can access a cross-origin response. Finally, I choose authentication storage based on the architecture and threat model rather than automatically putting tokens in `localStorage`. For many first-party applications, an `HttpOnly`, `Secure` session cookie or a backend-for-frontend architecture provides a better foundation.
+30, 
